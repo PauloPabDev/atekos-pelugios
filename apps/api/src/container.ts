@@ -36,6 +36,9 @@ import { makeMongoDeviceEventLog } from './modules/devices/infrastructure/mongo-
 import { makePgDeviceRepository } from './modules/devices/infrastructure/pg-device-repository'
 import { makeRedisDeviceCache } from './modules/devices/infrastructure/redis-device-cache'
 import { makeRedisDeviceEventBus } from './modules/devices/infrastructure/redis-device-event-bus'
+import { IngestTelemetry } from './modules/telemetry/application/ingest-telemetry'
+import { QueryTelemetry } from './modules/telemetry/application/query-telemetry'
+import { makeMongoTelemetryRepository } from './modules/telemetry/infrastructure/mongo-telemetry-repository'
 
 // Relativa a este archivo, no al cwd: vale igual desde src/container.ts que desde dist/main.js.
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url))
@@ -71,6 +74,7 @@ export async function createContainer(env: Env, logger: Logger) {
 	const eventLog = makeMongoDeviceEventLog(mongo)
 	const onChanged = makeOnDeviceChanged({ cache, bus, eventLog, logger })
 	const getDevice = new GetDevice({ repo: deviceRepo, cache })
+	const telemetryRepo = makeMongoTelemetryRepository(mongo)
 
 	return {
 		env,
@@ -107,6 +111,10 @@ export async function createContainer(env: Env, logger: Logger) {
 			getDataKey: new GetDataKey({ get: getDevice }),
 			listEvents: new ListEvents({ get: getDevice, eventLog }),
 			delete: new DeleteDevice({ repo: deviceRepo, cache, eventLog, redis, logger }),
+		},
+		telemetry: {
+			ingest: new IngestTelemetry({ get: getDevice, repo: telemetryRepo }),
+			query: new QueryTelemetry({ get: getDevice, repo: telemetryRepo }),
 		},
 		close: async () => {
 			await Promise.allSettled([pool.end(), mongoClient.close(), redis.close(), sub.close()])

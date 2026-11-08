@@ -10,6 +10,7 @@ import { rateLimit } from './shared/rate-limit'
 import { authRoutes } from './modules/auth/infrastructure/http-routes'
 import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
 import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
+import { telemetryRoutes } from './modules/telemetry/infrastructure/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -61,6 +62,7 @@ export function buildApp(c: Container) {
 	api.use('/auth', authRoutes(c))
 	api.use('/tokens', tokenRoutes(c))
 	api.use(deviceRoutes(c))
+	api.use(telemetryRoutes(c))
 
 	app.use('/api/v1', api)
 	app.use('/api', () => {
