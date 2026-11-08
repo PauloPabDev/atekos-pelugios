@@ -52,6 +52,7 @@ services:
       MONGO_DB: domotica
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       TOKEN_PEPPER: ${TOKEN_PEPPER}
+      PUBLIC_URL: ${PUBLIC_URL:-}
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/v1/health']
       interval: 10s

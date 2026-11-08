@@ -293,6 +293,18 @@ Base `/api/v1`. Los cuerpos son JSON validados con los esquemas de `packages/sha
 | WS `action room.update` / `room.switchLight` | `{ type: 'set', deviceId, state }` / `{ type: 'toggle', deviceId }` | |
 | Evento `{ event: 'room.update', data }` | `{ type: 'device.updated', device }` | |
 
+### MCP y OAuth (añadido después de la guía)
+
+Un asistente de IA entra por MCP con OAuth 2.1. Detalle completo en [`MCP.md`](MCP.md).
+
+| Método | Ruta | Acceso | Qué hace |
+|---|---|---|---|
+| `POST` | `/mcp` | Bearer OAuth (`mcp_…`) | Mensajes MCP (Streamable HTTP sin estado). Hay 10 herramientas para crear y actualizar dispositivos y pantallas. Sin token → 401 con `WWW-Authenticate: resource_metadata`. |
+| `GET` / `POST` | `/oauth/requests/:id` | sesión | Consentimiento: ver la petición y aprobarla o denegarla (`{ approve }` → `{ redirectTo }`). |
+| `GET` · `DELETE` | `/oauth/grants` · `/oauth/grants/:id` | sesión | Apps conectadas: listar y revocar. |
+
+Fuera de `/api/v1`: `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource/api/v1/mcp` y `/api/oauth/{authorize,token,register,revoke}`. Solo existen si la API tiene `PUBLIC_URL`.
+
 ---
 
 ## 7. Flujos clave
@@ -414,6 +426,8 @@ function ownerWith(actor: Actor, d: Target, scope: Scope) {
 ```
 
 Las acciones de administración (crear, borrar o cambiar la visibilidad de un dispositivo, y crear tokens) exigen `actor.kind === 'user'`: un token nunca puede crear otro token.
+
+> **Cambio posterior (MCP):** crear dispositivos y pantallas pasa por `canCreate(actor, scope)`. Lo cumplen la sesión, o un token sin ligar con `devices:write` / `displays:write` (y sin `display:connect`). Las rutas REST de alta siguen con `requireUser`, así que por REST no cambia nada; solo el MCP con OAuth llega al caso de uso con un token ([`MCP.md`](MCP.md#permisos)). Borrar, cambiar la visibilidad y crear tokens siguen siendo solo de sesión.
 
 ### 7.4 Autenticación: sesión web y tokens de API
 
@@ -860,6 +874,8 @@ coverage
 
 ### 10.4 Caddy
 
+Los archivos reales (`infra/proxy/` y la imagen única `infra/single/Caddyfile`) también envían `/ws/device` a la API (MetaDisplay).
+
 `infra/proxy/Caddyfile.dev`:
 
 ```caddyfile
@@ -868,6 +884,10 @@ coverage
 		reverse_proxy api:3000
 	}
 	handle /ws {
+		reverse_proxy api:3000
+	}
+	# Descubrimiento OAuth del MCP: en la raíz del dominio (MCP.md)
+	handle /.well-known/oauth-* {
 		reverse_proxy api:3000
 	}
 	handle {
@@ -889,7 +909,13 @@ coverage
 	handle /ws {
 		reverse_proxy api:3000
 	}
+	handle /.well-known/oauth-* {
+		reverse_proxy api:3000
+	}
 	handle {
+		# Contra el clickjacking en la pantalla de consentimiento OAuth
+		header X-Frame-Options DENY
+		header Content-Security-Policy "frame-ancestors 'none'"
 		root * /srv
 		try_files {path} /index.html
 		file_server
