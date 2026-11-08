@@ -4,6 +4,8 @@ import * as api from './api'
 import { Login, Register } from './pages/Auth'
 import { Devices } from './pages/Devices'
 import { DeviceDetail } from './pages/DeviceDetail'
+import { Displays } from './pages/Displays'
+import { DisplayDetail } from './pages/DisplayDetail'
 import { Tokens } from './pages/Tokens'
 import { PublicDevice } from './pages/PublicDevice'
 
@@ -16,6 +18,8 @@ export function App() {
 			<Route element={<Session />}>
 				<Route index element={<Devices />} />
 				<Route path="/devices/:id" element={<DeviceDetail />} />
+				<Route path="/displays" element={<Displays />} />
+				<Route path="/displays/:deviceId" element={<DisplayDetail />} />
 				<Route path="/tokens" element={<Tokens />} />
 			</Route>
 			<Route path="*" element={<main className="page">Página no encontrada.</main>} />
@@ -52,6 +56,7 @@ function Session() {
 					<NavLink to="/" end>
 						Dispositivos
 					</NavLink>
+					<NavLink to="/displays">Pantallas</NavLink>
 					<NavLink to="/tokens">Tokens</NavLink>
 				</nav>
 				<span className="muted">{me.data.username}</span>

@@ -265,3 +265,61 @@ button.danger {
 	border-radius: 4px;
 	user-select: all;
 }
+
+input[type='range'] {
+	padding: 0;
+	border: 0;
+	background: none;
+}
+
+/* MetaDisplay: vista previa ×2 que encoge en el móvil; en pantallas anchas, el editor al lado */
+.preview {
+	margin: 0 0 0.5rem;
+}
+
+.preview svg {
+	display: block;
+	width: 344px;
+	max-width: 100%;
+	height: auto;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+.preview text {
+	white-space: pre;
+}
+
+.preview figcaption {
+	font-size: 0.875rem;
+}
+
+.editor {
+	display: grid;
+	gap: 1rem;
+}
+
+@media (min-width: 48rem) {
+	.editor {
+		grid-template-columns: 344px minmax(0, 1fr);
+		align-items: start;
+	}
+}
+
+.table-wrap {
+	overflow-x: auto;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--card);
+}
+
+th,
+td {
+	padding: 0.4rem 0.6rem;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+	white-space: nowrap;
+}
