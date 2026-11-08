@@ -91,3 +91,68 @@ test('«Guardar y activar» hace PUT /template con el cuerpo; un 409 se explica 
 	expect(bodies[1]).toEqual({ ...edited, version: 2 })
 	expect(screen.queryByRole('alert')).toBeNull()
 })
+
+test('el formulario de params envía solo las claves cambiadas y no deja enviar un valor fuera de rango', async () => {
+	const withParams: DisplayTemplate = {
+		...inicio,
+		params: {
+			temp: { type: 'number', default: 21, min: 0, max: 50, description: 'Temperatura' },
+			alarma: { type: 'boolean', default: false },
+			estado: { type: 'string' },
+		},
+	}
+	const bodies: unknown[] = []
+	mockDisplay({
+		[`GET ${base}`]: () => ({ body: { ...detail, template: withParams, values: { estado: 'OK' } } }),
+		[`PATCH ${base}/data`]: (init) => {
+			bodies.push(JSON.parse(String(init?.body)))
+			return { body: { values: {} } }
+		},
+	})
+	renderApp('/displays/md-34B7DA01ABCD')
+
+	const temp = await screen.findByLabelText('temp: Temperatura')
+	expect(temp).toHaveValue(21) // el default, porque no hay valor guardado
+	expect(screen.getByLabelText('estado')).toHaveValue('OK')
+	const enviar = screen.getByRole('button', { name: 'Enviar parámetros' })
+	expect(enviar).toBeDisabled()
+
+	await userEvent.clear(temp)
+	await userEvent.type(temp, '80')
+	expect(screen.getByRole('alert')).toHaveTextContent('temp debe ser ≤ 50')
+	expect(enviar).toBeDisabled()
+
+	await userEvent.clear(temp)
+	await userEvent.type(temp, '30')
+	await userEvent.click(screen.getByLabelText('alarma'))
+	await userEvent.click(enviar)
+	expect(await screen.findByText('Enviado.')).toBeInTheDocument()
+	expect(bodies).toEqual([{ temp: 30, alarma: true }])
+})
+
+test('los eventos dicen si vienen de un toque o de un botón físico', async () => {
+	const ev = {
+		ts: now,
+		actionId: 'a',
+		name: 'data.set',
+		x: 0,
+		y: 0,
+		templateId: 'inicio',
+		templateVersion: 1,
+		status: 'ok',
+		toast: null,
+	}
+	mockDisplay({
+		[`GET ${base}/events`]: () => ({
+			body: [
+				{ ...ev, eventId: 'e1', source: 'button', button: 2, press: 'long' },
+				{ ...ev, eventId: 'e2', source: 'touch', button: null, press: null },
+				{ ...ev, eventId: 'e3', source: null, button: null, press: null },
+			],
+		}),
+	})
+	renderApp('/displays/md-34B7DA01ABCD')
+
+	const rows = (await screen.findAllByRole('row')).slice(1)
+	expect(rows.map((r) => within(r).getAllByRole('cell')[3]?.textContent)).toEqual(['botón 2 larga', 'toque', '—'])
+})
