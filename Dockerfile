@@ -56,7 +56,7 @@ RUN set -eux; \
 		/var/lib/apt/lists/* /var/cache/apt/* /var/log/*; \
 	groupadd --gid 1000 node; \
 	useradd --uid 1000 --gid node --create-home --shell /bin/bash node; \
-	# Un volumen nombrado montado en /data hereda este dueño al crearse.
+	# Un volumen nombrado hereda este dueño; un bind mount lo corrige start.sh antes de bajar a node.
 	mkdir /data; \
 	chown node:node /data
 COPY --from=bins /out/ /usr/local/bin/
@@ -75,7 +75,7 @@ COPY apps/api/drizzle drizzle
 COPY --from=build /repo/apps/web/dist /srv
 COPY infra/single/Caddyfile /etc/caddy/Caddyfile
 COPY --chmod=755 infra/single/start.sh /usr/local/bin/start.sh
-USER node
+# Sin USER node: start.sh arranca como root para corregir el dueño de /data y luego baja a node.
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=60s --retries=5 \
 	CMD curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null || exit 1

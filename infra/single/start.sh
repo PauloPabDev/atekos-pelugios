@@ -2,6 +2,15 @@
 # Arranca los 5 procesos de la imagen única. Si uno termina, se paran todos y el contenedor sale
 # (Coolify lo reinicia). Ante SIGTERM se detienen limpio, dentro de los 10 s de docker stop.
 set -euo pipefail
+
+# Un bind mount (p. ej. Source Path en Coolify) llega con el dueño del host, normalmente root: se arranca
+# como root solo para darle /data a node y todo lo demás corre como node (igual que la imagen de Postgres).
+if [ "$(id -u)" = 0 ]; then
+	find /data \! -user node -exec chown node:node {} +
+	export HOME=/home/node
+	exec setpriv --reuid=node --regid=node --init-groups "$0" "$@"
+fi
+
 PG=/usr/lib/postgresql/17/bin
 
 mkdir -p /data/mongo /data/redis
