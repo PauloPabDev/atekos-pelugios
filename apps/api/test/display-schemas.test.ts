@@ -55,6 +55,7 @@ describe('esquemas MetaDisplay', () => {
 		expect(t({ scopes: ['display:connect', 'displays:write'], displayId })).toBe(false)
 		expect(t({ scopes: ['devices:read'], displayId })).toBe(false)
 		expect(t({ scopes: ['display:connect'], displayId, deviceId: displayId })).toBe(false)
+		expect(t({ scopes: ['displays:write'], deviceId: displayId })).toBe(false)
 		expect(t({ scopes: ['display:connect'], displayId })).toBe(true)
 		expect(t({ scopes: ['displays:write'] })).toBe(true)
 		expect(t({ scopes: ['devices:read', 'devices:write'] })).toBe(true)

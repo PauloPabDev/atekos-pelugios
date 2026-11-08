@@ -152,6 +152,8 @@ export const CreateTokenInput = z
 		if (t.scopes.includes('display:connect') && t.scopes.includes('displays:write'))
 			issue('display:connect y displays:write no pueden ir en el mismo token')
 		if (t.displayId && t.deviceId) issue('un token no puede ligarse a un dispositivo y a una pantalla a la vez')
+		if (t.deviceId && t.scopes.some((s) => DISPLAY_SCOPES.includes(s)))
+			issue('un token ligado a un dispositivo no admite scopes de pantallas')
 		if (t.displayId && t.scopes.some((s) => !DISPLAY_SCOPES.includes(s)))
 			issue('un token ligado a una pantalla solo admite display:connect o displays:write')
 	})
