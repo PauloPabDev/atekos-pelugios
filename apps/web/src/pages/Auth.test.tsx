@@ -55,3 +55,42 @@ test('ruta protegida sin sesión (/auth/me → 401) redirige a /login', async ()
 
 	expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument()
 })
+
+test('sin sesión en /autorizar, tras entrar vuelve a la misma solicitud (?next=)', async () => {
+	let loggedIn = false
+	mockFetch({
+		'POST /api/v1/auth/login': () => {
+			loggedIn = true
+			return { body: user }
+		},
+		'GET /api/v1/auth/me': () => (loggedIn ? { body: user } : unauthorized),
+		'GET /api/v1/oauth/requests/req-1': () => ({
+			body: { clientName: 'Claude', redirectHost: 'claude.ai', scopes: ['devices:read'] },
+		}),
+	})
+	renderApp('/autorizar?req=req-1')
+
+	expect(await screen.findByRole('link', { name: 'Regístrate' })).toHaveAttribute(
+		'href',
+		'/register?next=%2Fautorizar%3Freq%3Dreq-1',
+	)
+	await fillLogin()
+
+	expect(await screen.findByRole('heading', { name: 'Autorizar a Claude' })).toBeInTheDocument()
+})
+
+test('login con ?next=//evil.com no sale de la web: va a /', async () => {
+	let loggedIn = false
+	mockFetch({
+		'POST /api/v1/auth/login': () => {
+			loggedIn = true
+			return { body: user }
+		},
+		'GET /api/v1/auth/me': () => (loggedIn ? { body: user } : unauthorized),
+		'GET /api/v1/devices': () => ({ body: [] }),
+	})
+	renderApp('/login?next=%2F%2Fevil.com')
+	await fillLogin()
+
+	expect(await screen.findByRole('heading', { name: 'Mis dispositivos' })).toBeInTheDocument()
+})
