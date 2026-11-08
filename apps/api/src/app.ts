@@ -13,6 +13,8 @@ import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
 import { telemetryRoutes } from './modules/telemetry/infrastructure/http-routes'
 import { displayRoutes } from './modules/displays/infrastructure/http-routes'
 import { oauthConsentRoutes, oauthServerRoutes } from './modules/oauth/infrastructure/http-routes'
+import { MCP_PATH } from './modules/oauth/application/provider'
+import { mcpRoutes } from './mcp/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -39,6 +41,7 @@ export function buildApp(c: Container) {
 		next()
 	})
 	app.use(express.json({ limit: '32kb' }))
+	if (c.oauth) app.use(MCP_PATH, mcpRoutes(c, c.oauth))
 
 	const api = express.Router()
 	api.get('/health', async (_req, res) => {

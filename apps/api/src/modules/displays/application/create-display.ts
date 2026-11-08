@@ -1,6 +1,6 @@
 import type { DisplayTemplate } from '@atekos/shared'
-import { Conflict } from '../../../shared/errors'
-import type { Actor } from '../../devices/domain/policy'
+import { Conflict, Forbidden } from '../../../shared/errors'
+import { canCreate, type Actor } from '../../devices/domain/policy'
 import { toDisplay, type DisplayDeps } from './access'
 
 // Plantilla inicial (DISENO §2): el dispositivo dibuja algo desde el primer hello.
@@ -18,8 +18,10 @@ export const initialTemplate = (name: string): DisplayTemplate => ({
 export class CreateDisplay {
 	constructor(private readonly deps: Pick<DisplayDeps, 'repo'>) {}
 
-	// Solo sesión. `deviceId` ya viene normalizado por DisplayHardwareId; el unique global da el 409.
-	async execute(actor: Extract<Actor, { kind: 'user' }>, input: { deviceId: string; name: string }) {
+	// La REST solo llega con sesión; el MCP, con un token OAuth con displays:write (canCreate).
+	// `deviceId` ya viene normalizado por DisplayHardwareId; el unique global da el 409.
+	async execute(actor: Actor, input: { deviceId: string; name: string }) {
+		if (actor.kind === 'anonymous' || !canCreate(actor, 'displays:write')) throw Forbidden()
 		const d = await this.deps.repo.create(
 			{ ownerId: actor.userId, hardwareId: input.deviceId, name: input.name },
 			initialTemplate(input.name),

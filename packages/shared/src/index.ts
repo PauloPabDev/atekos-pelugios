@@ -322,7 +322,7 @@ export type DisplayTouchAction = z.infer<typeof DisplayTouchAction>
 export const DisplayTemplate = z
 	.object({
 		id: z.string().min(1).max(64),
-		version: z.number().int().min(0),
+		version: z.number().int().min(0).max(2_147_483_647), // integer en PG: más allá, el INSERT daría un 500
 		background: Color.optional(),
 		elements: z.array(DisplayElement).max(45),
 		actions: z.array(DisplayTouchAction).max(24),

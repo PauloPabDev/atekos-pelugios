@@ -15,12 +15,6 @@ import { NotFound, Unprocessable } from '../../../shared/errors'
 
 const EventsQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) })
 
-// `version` es integer en PG: más allá de 2^31-1 el INSERT fallaría con un 500.
-const Template = DisplayTemplate.refine((t) => t.version <= 2_147_483_647, {
-	message: 'version fuera de rango',
-	path: ['version'],
-})
-
 // Una plantilla o unos valores inválidos → 422 con `issues` (DISENO §3), no el 400 genérico de zod.
 const valid =
 	<T extends z.ZodType>(schema: T, code: string, message: string) =>
@@ -29,7 +23,7 @@ const valid =
 		if (!r.success) throw Unprocessable(code, message, r.error.issues)
 		return r.data
 	}
-const template = valid(Template, 'invalid_template', 'Plantilla inválida')
+const template = valid(DisplayTemplate, 'invalid_template', 'Plantilla inválida')
 const values = valid(DisplayValues, 'invalid_data', 'Datos inválidos')
 
 // `md-` + 12 hex, normalizado; cualquier otra cosa es una pantalla que no existe.
