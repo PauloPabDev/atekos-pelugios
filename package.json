@@ -1,0 +1,28 @@
+{
+	"name": "atekos-pelugios",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@11.28.11+sha512.740184d10f81f5d5b165be88560ee7ba62406c4134896abc27a580109eec2f47c1e41d91251c944c2cababcb1c22461799ebb72de2ec625af2030b0e36c735a3",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
+		"dev:down": "docker compose -f compose.yml -f compose.dev.yml down",
+		"prod": "docker compose -f compose.yml -f compose.prod.yml up -d --build",
+		"prod:logs": "docker compose -f compose.yml -f compose.prod.yml logs -f api proxy",
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"typecheck": "pnpm -r typecheck",
+		"test": "pnpm -r test",
+		"build": "pnpm -r build"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.14.0",
+		"eslint-config-prettier": "^10.1.8",
+		"prettier": "^3.9.10",
+		"typescript": "~6.0.3",
+		"typescript-eslint": "^8.72.1"
+	}
+}
