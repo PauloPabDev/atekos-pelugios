@@ -2,6 +2,7 @@
 
 > Lado **servidor** del protocolo MetaDisplay 1.0 ([`CONTRATO.md`](./CONTRATO.md), [`openapi.yaml`](./openapi.yaml), [`asyncapi.yaml`](./asyncapi.yaml)) integrado con los usuarios, tokens, PG, Mongo y Redis de atekos. El firmware ESP32-C6 queda fuera del repo.
 > Este documento **manda sobre el contrato** donde se aparta de él. Cada desviación está marcada con **≠**.
+> El contrato que implementa atekos se **genera de los esquemas zod** y se publica en `/contrato`, `/api/v1/contract/*.json` y el MCP: ver [`README.md`](./README.md).
 
 ## 1. Decisiones
 

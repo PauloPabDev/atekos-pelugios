@@ -15,6 +15,7 @@ import { displayRoutes } from './modules/displays/infrastructure/http-routes'
 import { oauthConsentRoutes, oauthServerRoutes } from './modules/oauth/infrastructure/http-routes'
 import { MCP_PATH } from './modules/oauth/application/provider'
 import { mcpRoutes } from './mcp/http-routes'
+import { CONTRACT_FILES, contractJson, type ContractFile } from './contract'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -54,6 +55,12 @@ export function buildApp(c: Container) {
 		const failed = Object.keys(checks).filter((_, i) => results[i]?.status === 'rejected')
 		if (failed.length) return res.status(503).json({ status: 'error', failed })
 		res.json({ status: 'ok' })
+	})
+	// Contrato MetaDisplay, público: lo leen el firmware, la página /contrato y el MCP (docs/metadisplay/README.md).
+	api.get('/contract/:file', (req, res) => {
+		const file = req.params.file as ContractFile
+		if (!CONTRACT_FILES.includes(file)) throw NotFound('Contrato')
+		res.type('json').send(contractJson(file, c.env.PUBLIC_URL ?? `${req.protocol}://${req.get('host')}`))
 	})
 	// Después de /health: el healthcheck no depende de Redis para resolver el actor.
 	api.use(authenticate(c))

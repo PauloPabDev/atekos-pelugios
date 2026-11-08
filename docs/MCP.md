@@ -64,6 +64,7 @@ El consentimiento concede estos scopes. El cliente puede pedir menos; si no pide
 | `devices:read` | `list_devices`, `get_device`. |
 | `devices:write` | `create_device`, `set_device_state`, `update_device_data`. |
 | `displays:write` | `list_displays`, `get_display`, `create_display`, `set_display_template`, `update_display_data`. |
+| cualquiera | `get_display_contract` y los recursos del contrato (es público). |
 
 - El grant actúa como un **token sin ligar del usuario** (`kind: 'token'`, sin `deviceId` ni `displayId`). Las políticas de siempre (`canRead`, `canWrite`, `canAdminDisplay`) deciden con sus scopes.
 - **Altas:** `canCreate` (`apps/api/src/modules/devices/domain/policy.ts`) deja crear a la sesión y a un token sin ligar con el scope de escritura. La REST no cambia: `POST /devices` y `POST /displays` siguen exigiendo sesión en la ruta. Solo el MCP llega al caso de uso con un token.
@@ -85,8 +86,11 @@ Todas devuelven el JSON del caso de uso en `content[0].text`. Un error del domin
 | `create_display` | `{ deviceId, name }` | `Display`, con la plantilla `inicio` |
 | `set_display_template` | `{ deviceId, template }` (`DisplayTemplate`) | `DisplayDetail`. Guarda y activa la plantilla; si la pantalla está online, la recibe al momento. |
 | `update_display_data` | `{ deviceId, values }` (`DisplayValues`), con merge | `{ values }` |
+| `get_display_contract` | `{ part?: 'asyncapi' \| 'openapi' }` (por defecto `asyncapi`) | El contrato MetaDisplay vigente: `info.version` e `info["x-updated"]` dicen su versión y su última actualización ([`metadisplay/README.md`](metadisplay/README.md)). |
 
-Los esquemas de entrada son los de `packages/shared`, así que la IA recibe el mismo JSON Schema que valida la REST. El servidor manda además unas `instructions` breves: el lienzo de 172×320, el flujo de las pantallas y qué no puede hacer.
+Los esquemas de entrada son los de `packages/shared`, así que la IA recibe el mismo JSON Schema que valida la REST. El servidor manda además unas `instructions` breves: el lienzo de 172×320, el flujo de las pantallas, qué no puede hacer y que consulte el contrato antes de diseñar.
+
+El contrato también está como **recursos MCP**, `atekos://contract/asyncapi.json` y `atekos://contract/openapi.json`, para los clientes que permiten adjuntarlos (por ejemplo, con `@` en Claude Code).
 
 ### Flujo típico de una pantalla
 
@@ -178,4 +182,4 @@ curl -s -X POST $B/api/v1/mcp -H "authorization: Bearer $TOKEN" \
 
 El [MCP Inspector](https://github.com/modelcontextprotocol/inspector) (`npx @modelcontextprotocol/inspector`) también sirve. Se elige el transporte *Streamable HTTP* con la URL del MCP y hace el flujo OAuth completo.
 
-Tests: `apps/api/test/oauth.test.ts` (servidor de autorización) y `apps/api/test/mcp.test.ts` (herramientas con el cliente del SDK).
+Tests: `apps/api/test/oauth.test.ts` (servidor de autorización) y `apps/api/test/mcp.test.ts` (herramientas y recursos con el cliente del SDK).

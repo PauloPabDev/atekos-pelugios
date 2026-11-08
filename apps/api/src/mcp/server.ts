@@ -11,6 +11,7 @@ import {
 	DisplayValues,
 	PatchDataInput,
 } from '@atekos/shared'
+import { CONTRACT_FILES, contractJson } from '../contract'
 import type { Container } from '../container'
 import type { Actor } from '../modules/devices/domain/policy'
 import { AppError } from '../shared/errors'
@@ -19,6 +20,7 @@ const INSTRUCTIONS = `Servidor de domótica atekos-pelugios. Gestiona los dispos
 - Dispositivos: tienen un estado on/off (state) y un objeto data libre; update_device_data hace merge superficial sobre data.
 - Pantallas MetaDisplay: ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} px, identificadas por su deviceId «md-» + 12 hex. Flujo: create_display → set_display_template (guarda y activa la plantilla) → update_display_data (rellena las variables que la plantilla usa con bind).
 - La pantalla física se conecta con un token display:connect que el usuario crea en la web (Tokens); este servidor no crea tokens ni borra nada.
+- El contrato oficial de las pantallas (mensajes del WSS /ws/device, plantillas, límites y la REST) está en get_display_contract y en los recursos atekos://contract/*: consúltalo antes de diseñar plantillas o features.
 - Los errores vuelven como resultado con isError y un JSON { error, message, issues }: corrige con los issues y reintenta.`
 
 const DeviceId = z.uuid().describe('id (uuid) del dispositivo')
@@ -143,6 +145,31 @@ export function buildMcpServer(c: Container, actor: Extract<Actor, { kind: 'toke
 		},
 		({ deviceId, values }) => run(() => s.patchData.execute(actor, deviceId, values)),
 	)
+
+	// Contrato MetaDisplay (docs/metadisplay/README.md): el mismo JSON que GET /api/v1/contract/*.
+	const origin = c.env.PUBLIC_URL!
+	server.registerTool(
+		'get_display_contract',
+		{
+			title: 'Contrato de las pantallas',
+			description:
+				'Contrato MetaDisplay vigente con su versión y fecha (info.version, info["x-updated"]). asyncapi: lo que intercambian la pantalla y el servidor por WSS /ws/device. openapi: la REST de pantallas.',
+			inputSchema: { part: z.enum(['asyncapi', 'openapi']).default('asyncapi') },
+			annotations: read,
+		},
+		({ part }) => ({ content: [{ type: 'text', text: contractJson(`${part}.json`, origin) }] }),
+	)
+	for (const file of CONTRACT_FILES)
+		server.registerResource(
+			`contrato-${file}`,
+			`atekos://contract/${file}`,
+			{
+				title: `Contrato MetaDisplay (${file})`,
+				description: file.startsWith('async') ? 'Protocolo WSS /ws/device' : 'REST /api/v1/displays',
+				mimeType: 'application/json',
+			},
+			(uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: contractJson(file, origin) }] }),
+		)
 
 	return server
 }
