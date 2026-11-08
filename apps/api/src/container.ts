@@ -19,6 +19,23 @@ import { ListTokens } from './modules/tokens/application/list-tokens'
 import { RevokeToken } from './modules/tokens/application/revoke-token'
 import { VerifyToken } from './modules/tokens/application/verify-token'
 import { makePgTokenRepository } from './modules/tokens/infrastructure/pg-token-repository'
+import { CreateDevice } from './modules/devices/application/create-device'
+import { DeleteDevice } from './modules/devices/application/delete-device'
+import { GetDataKey } from './modules/devices/application/get-data-key'
+import { GetDevice } from './modules/devices/application/get-device'
+import { GetState } from './modules/devices/application/get-state'
+import { ListDevices } from './modules/devices/application/list-devices'
+import { ListEvents } from './modules/devices/application/list-events'
+import { ListPublicDevices } from './modules/devices/application/list-public-devices'
+import { makeOnDeviceChanged } from './modules/devices/application/on-device-changed'
+import { PatchData } from './modules/devices/application/patch-data'
+import { PatchDevice } from './modules/devices/application/patch-device'
+import { SetState } from './modules/devices/application/set-state'
+import { ToggleState } from './modules/devices/application/toggle-state'
+import { makeMongoDeviceEventLog } from './modules/devices/infrastructure/mongo-device-event-log'
+import { makePgDeviceRepository } from './modules/devices/infrastructure/pg-device-repository'
+import { makeRedisDeviceCache } from './modules/devices/infrastructure/redis-device-cache'
+import { makeRedisDeviceEventBus } from './modules/devices/infrastructure/redis-device-event-bus'
 
 // Relativa a este archivo, no al cwd: vale igual desde src/container.ts que desde dist/main.js.
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url))
@@ -38,11 +55,22 @@ export async function createContainer(env: Env, logger: Logger) {
 	// Igual que en pg: node-redis emite 'error' al reconectar y sin listener el proceso cae.
 	redis.on('error', (err) => logger.error({ err }, 'redis'))
 	await redis.connect()
+	// Conexión aparte para el bus: en modo subscribe una conexión no acepta otros comandos.
+	const sub = redis.duplicate()
+	sub.on('error', (err) => logger.error({ err }, 'redis sub'))
+	await sub.connect()
 
 	const users = makePgUserRepository(db)
 	const sessions = makeRedisSessionStore(redis, env.SESSION_TTL_SECONDS)
 	const repo = makePgTokenRepository(db)
 	const hasher = makeTokenHasher(env.TOKEN_PEPPER)
+
+	const deviceRepo = makePgDeviceRepository(db)
+	const cache = makeRedisDeviceCache(redis)
+	const bus = makeRedisDeviceEventBus(redis, sub)
+	const eventLog = makeMongoDeviceEventLog(mongo)
+	const onChanged = makeOnDeviceChanged({ cache, bus, eventLog, logger })
+	const getDevice = new GetDevice({ repo: deviceRepo, cache })
 
 	return {
 		env,
@@ -65,8 +93,23 @@ export async function createContainer(env: Env, logger: Logger) {
 			revoke: new RevokeToken({ repo, redis }),
 			verify: new VerifyToken({ repo, redis, hasher }),
 		},
+		devices: {
+			bus,
+			create: new CreateDevice({ repo: deviceRepo, onChanged }),
+			get: getDevice,
+			list: new ListDevices({ repo: deviceRepo }),
+			listPublic: new ListPublicDevices({ repo: deviceRepo }),
+			getState: new GetState({ repo: deviceRepo, cache }),
+			setState: new SetState({ repo: deviceRepo, onChanged }),
+			toggle: new ToggleState({ repo: deviceRepo, onChanged }),
+			patch: new PatchDevice({ repo: deviceRepo, onChanged }),
+			patchData: new PatchData({ repo: deviceRepo, onChanged }),
+			getDataKey: new GetDataKey({ get: getDevice }),
+			listEvents: new ListEvents({ get: getDevice, eventLog }),
+			delete: new DeleteDevice({ repo: deviceRepo, cache, eventLog, redis, logger }),
+		},
 		close: async () => {
-			await Promise.allSettled([pool.end(), mongoClient.close(), redis.close()])
+			await Promise.allSettled([pool.end(), mongoClient.close(), redis.close(), sub.close()])
 		},
 	}
 }

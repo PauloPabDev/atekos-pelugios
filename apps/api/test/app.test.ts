@@ -4,12 +4,12 @@ import { expect, it } from 'vitest'
 import { buildApp } from '../src/app'
 import type { Container } from '../src/container'
 
-// Sin Docker: solo lo que /health usa. Redis «cuelga» como cuando node-redis encola comandos mientras reconecta.
+// Sin Docker: solo lo que /health y el rate limit usan. El ping a Redis «cuelga» como cuando node-redis encola comandos mientras reconecta.
 const fake = {
 	logger: pino({ level: 'silent' }),
 	pool: { query: async () => ({}) },
 	mongo: { command: async () => Promise.reject(new Error('caído')) },
-	redis: { ping: () => new Promise(() => {}) },
+	redis: { ping: () => new Promise(() => {}), incr: async () => 1, expire: async () => 1 },
 } as unknown as Container
 const app = buildApp(fake)
 

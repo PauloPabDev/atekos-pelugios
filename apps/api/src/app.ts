@@ -6,8 +6,10 @@ import { ZodError } from 'zod'
 import type { Container } from './container'
 import { AppError, NotFound, UnsupportedMediaType } from './shared/errors'
 import { authenticate } from './shared/auth'
+import { rateLimit } from './shared/rate-limit'
 import { authRoutes } from './modules/auth/infrastructure/http-routes'
 import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
+import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -47,8 +49,18 @@ export function buildApp(c: Container) {
 	})
 	// Después de /health: el healthcheck no depende de Redis para resolver el actor.
 	api.use(authenticate(c))
+	// Resto de la API (§9): 300 por minuto por actor, o por IP si es anónimo.
+	api.use(
+		rateLimit(c.redis, {
+			name: 'api',
+			windowSec: 60,
+			max: 300,
+			key: ({ actor, ip }) => (actor.kind === 'user' ? actor.userId : actor.kind === 'token' ? actor.tokenId : `${ip}`),
+		}),
+	)
 	api.use('/auth', authRoutes(c))
 	api.use('/tokens', tokenRoutes(c))
+	api.use(deviceRoutes(c))
 
 	app.use('/api/v1', api)
 	app.use('/api', () => {
