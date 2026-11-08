@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { devices } from '../src/db/schema'
+import { makeRedisDeviceCache } from '../src/modules/devices/infrastructure/redis-device-cache'
 import { makeTokenHasher } from '../src/shared/crypto'
 import { startStack } from './stack'
 
@@ -188,6 +189,16 @@ describe('devices', () => {
 		expect(results.filter((r) => r.body.state).length).toBe(5)
 		const events = s.c.mongo.collection('device_events')
 		expect(await events.countDocuments({ deviceId: d.id, type: 'state.changed' })).toBe(10)
+		// La caché (lo que lee el ESP) termina igual que PG aunque los SET lleguen desordenados.
+		expect(JSON.parse((await s.c.redis.get(`device:${d.id}`))!)).toMatchObject({ state: false })
+	})
+
+	it('caché: un SET con updatedAt más viejo no pisa uno más nuevo', async () => {
+		const { agent } = await registered()
+		const d = await create(agent)
+		const { body: newer } = await agent.post(api(`/devices/${d.id}/toggle`)).expect(200)
+		await makeRedisDeviceCache(s.c.redis).set({ ...newer, state: false, updatedAt: d.updatedAt })
+		expect(JSON.parse((await s.c.redis.get(`device:${d.id}`))!)).toMatchObject({ state: true })
 	})
 
 	it('data: merge, GET de una clave y 404 si no existe', async () => {

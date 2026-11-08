@@ -52,7 +52,7 @@ export const makePgDeviceRepository = (db: NodePgDatabase): DeviceRepository => 
 		return one(
 			db
 				.update(devices)
-				.set({ ...patch, updatedAt: sql`now()` })
+				.set({ ...patch, updatedAt: sql`clock_timestamp()` })
 				.where(eq(devices.id, id))
 				.returning(),
 		)
@@ -61,7 +61,7 @@ export const makePgDeviceRepository = (db: NodePgDatabase): DeviceRepository => 
 		return one(
 			db
 				.update(devices)
-				.set({ state, updatedAt: sql`now()` })
+				.set({ state, updatedAt: sql`clock_timestamp()` })
 				.where(eq(devices.id, id))
 				.returning(),
 		)
@@ -70,7 +70,7 @@ export const makePgDeviceRepository = (db: NodePgDatabase): DeviceRepository => 
 		return one(
 			db
 				.update(devices)
-				.set({ state: sql`NOT ${devices.state}`, updatedAt: sql`now()` })
+				.set({ state: sql`NOT ${devices.state}`, updatedAt: sql`clock_timestamp()` })
 				.where(eq(devices.id, id))
 				.returning(),
 		)
@@ -79,7 +79,7 @@ export const makePgDeviceRepository = (db: NodePgDatabase): DeviceRepository => 
 		return one(
 			db
 				.update(devices)
-				.set({ data: sql`${devices.data} || ${JSON.stringify(patch)}::jsonb`, updatedAt: sql`now()` })
+				.set({ data: sql`${devices.data} || ${JSON.stringify(patch)}::jsonb`, updatedAt: sql`clock_timestamp()` })
 				.where(eq(devices.id, id))
 				.returning(),
 		)
