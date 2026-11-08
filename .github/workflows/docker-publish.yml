@@ -1,0 +1,122 @@
+# Construye la imagen y la publica en GitHub Packages (ghcr.io/<owner>/<repo>).
+#
+#   push a main        → :latest, :main y :sha-<corto>, y despliega en Coolify
+#   tag v1.2.3         → :1.2.3, :1.2 y :sha-<corto>
+#   pull request       → solo construye (verifica que compile), no publica
+#   manual             → Actions → "Publicar imagen" → Run workflow
+#
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   COOLIFY_TOKEN    token de la API de Coolify, solo con permiso `deploy`
+#   COOLIFY_WEBHOOK  URL del Deploy Webhook del recurso en Coolify
+#
+# Seguridad: usa el GITHUB_TOKEN temporal del job (sin tokens personales guardados),
+# permisos mínimos y actions fijadas por SHA. La imagen lleva procedencia (SLSA) y SBOM.
+# Ni la URL ni el token de Coolify aparecen en el código ni en los logs.
+
+name: Publicar imagen
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Un solo build por rama a la vez; uno nuevo cancela al anterior.
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # leer el código
+      packages: write # publicar en ghcr.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Login en GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Título, descripción, source y revision salen solos del repo.
+      # Las anotaciones van también al index: así GHCR enlaza el paquete con el repo.
+      - name: Etiquetas y metadatos
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build y publicación
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: prod # imagen única: Postgres, MongoDB, Redis, API y web
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Despliegue en Coolify: solo cuando main publicó la imagen (:latest) sin errores.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {} # solo hace una petición HTTP; no necesita el token de GitHub
+    # Un despliegue a la vez y sin cancelar uno que ya empezó.
+    concurrency:
+      group: deploy-coolify
+      cancel-in-progress: false
+    steps:
+      - name: Avisar a Coolify
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+        run: |
+          for s in COOLIFY_TOKEN COOLIFY_WEBHOOK; do
+            if [ -z "${!s}" ]; then
+              echo "::error::Falta el secreto $s (Settings → Secrets and variables → Actions)"
+              exit 1
+            fi
+          done
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            --retry 3 --retry-connrefused \
+            --header "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_WEBHOOK"
+          echo
