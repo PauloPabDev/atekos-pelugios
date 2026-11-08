@@ -1,0 +1,1010 @@
+{
+	"asyncapi": "3.0.0",
+	"info": {
+		"title": "MetaDisplay en atekos-pelugios",
+		"version": "1.0.0",
+		"description": "Protocolo MetaDisplay 1 sobre WSS: JSON UTF-8 en tramas de texto de hasta 8192 bytes, lienzo de 172×320. El token va solo en la cabecera Authorization del upgrade (nunca en la query).",
+		"x-updated": "2026-11-08",
+		"x-protocol": 1,
+		"x-max-frame-bytes": 8192
+	},
+	"defaultContentType": "application/json",
+	"servers": {
+		"atekos": {
+			"host": "atekos.toxolinko.site",
+			"protocol": "wss",
+			"pathname": "/ws/device",
+			"security": [
+				{
+					"$ref": "#/components/securitySchemes/deviceToken"
+				}
+			]
+		}
+	},
+	"channels": {
+		"device": {
+			"address": "/ws/device",
+			"messages": {
+				"device.hello": {
+					"$ref": "#/components/messages/device.hello"
+				},
+				"template.ack": {
+					"$ref": "#/components/messages/template.ack"
+				},
+				"data.ack": {
+					"$ref": "#/components/messages/data.ack"
+				},
+				"touch.tap": {
+					"$ref": "#/components/messages/touch.tap"
+				},
+				"trust.ack": {
+					"$ref": "#/components/messages/trust.ack"
+				},
+				"ota.ack": {
+					"$ref": "#/components/messages/ota.ack"
+				},
+				"template.set": {
+					"$ref": "#/components/messages/template.set"
+				},
+				"data.update": {
+					"$ref": "#/components/messages/data.update"
+				},
+				"ui.result": {
+					"$ref": "#/components/messages/ui.result"
+				},
+				"event.ack": {
+					"$ref": "#/components/messages/event.ack"
+				},
+				"display.refresh": {
+					"$ref": "#/components/messages/display.refresh"
+				},
+				"display.brightness": {
+					"$ref": "#/components/messages/display.brightness"
+				}
+			}
+		}
+	},
+	"operations": {
+		"recibirDelDispositivo": {
+			"action": "receive",
+			"channel": {
+				"$ref": "#/channels/device"
+			},
+			"messages": [
+				{
+					"$ref": "#/channels/device/messages/device.hello"
+				},
+				{
+					"$ref": "#/channels/device/messages/template.ack"
+				},
+				{
+					"$ref": "#/channels/device/messages/data.ack"
+				},
+				{
+					"$ref": "#/channels/device/messages/touch.tap"
+				},
+				{
+					"$ref": "#/channels/device/messages/trust.ack"
+				},
+				{
+					"$ref": "#/channels/device/messages/ota.ack"
+				}
+			]
+		},
+		"enviarAlDispositivo": {
+			"action": "send",
+			"channel": {
+				"$ref": "#/channels/device"
+			},
+			"messages": [
+				{
+					"$ref": "#/channels/device/messages/template.set"
+				},
+				{
+					"$ref": "#/channels/device/messages/data.update"
+				},
+				{
+					"$ref": "#/channels/device/messages/ui.result"
+				},
+				{
+					"$ref": "#/channels/device/messages/event.ack"
+				},
+				{
+					"$ref": "#/channels/device/messages/display.refresh"
+				},
+				{
+					"$ref": "#/channels/device/messages/display.brightness"
+				}
+			]
+		}
+	},
+	"components": {
+		"securitySchemes": {
+			"deviceToken": {
+				"type": "http",
+				"scheme": "bearer",
+				"description": "Token dmt_ con el scope display:connect, ligado a la pantalla. Lo crea su dueño en la web (Tokens)."
+			}
+		},
+		"messages": {
+			"device.hello": {
+				"name": "device.hello",
+				"title": "device.hello",
+				"summary": "Primer mensaje tras conectar: identidad, firmware, pantalla y la plantilla en caché (id y version). El deviceId debe ser el de la pantalla a la que está ligado el token.",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "device.hello"
+						},
+						"protocol": {
+							"type": "number",
+							"const": 1
+						},
+						"deviceId": {
+							"type": "string",
+							"maxLength": 64
+						},
+						"firmware": {
+							"type": "string",
+							"maxLength": 64
+						},
+						"display": {
+							"type": "object",
+							"properties": {
+								"width": {
+									"type": "number"
+								},
+								"height": {
+									"type": "number"
+								},
+								"touch": {
+									"type": "boolean"
+								}
+							},
+							"required": [
+								"width",
+								"height"
+							],
+							"additionalProperties": {}
+						},
+						"template": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"maxLength": 64
+								},
+								"version": {
+									"type": "integer"
+								}
+							},
+							"required": [
+								"id",
+								"version"
+							]
+						},
+						"capabilities": {
+							"maxItems": 32,
+							"type": "array",
+							"items": {
+								"type": "string",
+								"maxLength": 32
+							}
+						}
+					},
+					"required": [
+						"type",
+						"protocol",
+						"deviceId",
+						"display"
+					]
+				}
+			},
+			"template.ack": {
+				"name": "template.ack",
+				"title": "template.ack",
+				"summary": "Confirma o rechaza (ok:false, reason) la plantilla recibida.",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "template.ack"
+						},
+						"ok": {
+							"type": "boolean"
+						},
+						"reason": {
+							"type": "string",
+							"maxLength": 100
+						},
+						"templateId": {
+							"type": "string"
+						},
+						"version": {
+							"type": "number"
+						}
+					},
+					"required": [
+						"type",
+						"ok"
+					]
+				}
+			},
+			"data.ack": {
+				"name": "data.ack",
+				"title": "data.ack",
+				"summary": "Confirma un data.update. Con otra templateVersion: ok:false, reason \"version_mismatch\".",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "data.ack"
+						},
+						"ok": {
+							"type": "boolean"
+						},
+						"reason": {
+							"type": "string",
+							"maxLength": 100
+						}
+					},
+					"required": [
+						"type",
+						"ok"
+					]
+				}
+			},
+			"touch.tap": {
+				"name": "touch.tap",
+				"title": "touch.tap",
+				"summary": "Toque sobre una acción remote o hybrid. El eventId es idempotente: el servidor deduplica y responde ui.result o event.ack.",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "touch.tap"
+						},
+						"eventId": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100
+						},
+						"deviceId": {
+							"type": "string",
+							"maxLength": 64
+						},
+						"actionId": {
+							"type": "string",
+							"maxLength": 48
+						},
+						"name": {
+							"type": "string",
+							"maxLength": 64
+						},
+						"x": {
+							"type": "integer"
+						},
+						"y": {
+							"type": "integer"
+						},
+						"templateId": {
+							"type": "string",
+							"maxLength": 64
+						},
+						"templateVersion": {
+							"type": "integer"
+						},
+						"uptimeMs": {
+							"type": "number"
+						}
+					},
+					"required": [
+						"type",
+						"eventId",
+						"deviceId",
+						"actionId",
+						"x",
+						"y",
+						"templateVersion"
+					]
+				}
+			},
+			"trust.ack": {
+				"name": "trust.ack",
+				"title": "trust.ack",
+				"summary": "Reservado: el servidor aún no envía trust.* (pendiente de homologar el hardware).",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "trust.ack"
+						},
+						"operation": {
+							"type": "string",
+							"maxLength": 16
+						},
+						"ok": {
+							"type": "boolean"
+						},
+						"reason": {
+							"type": "string",
+							"maxLength": 100
+						}
+					},
+					"required": [
+						"type",
+						"ok"
+					]
+				}
+			},
+			"ota.ack": {
+				"name": "ota.ack",
+				"title": "ota.ack",
+				"summary": "Reservado: el servidor aún no envía ota.install (pendiente de homologar el hardware).",
+				"x-from": "device",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "ota.ack"
+						},
+						"ok": {
+							"type": "boolean"
+						},
+						"reason": {
+							"type": "string",
+							"maxLength": 100
+						}
+					},
+					"required": [
+						"type",
+						"ok"
+					]
+				}
+			},
+			"template.set": {
+				"name": "template.set",
+				"title": "template.set",
+				"summary": "Plantilla completa. Solo se envía si la del hello no coincide en id y version.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "template.set"
+						},
+						"template": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 64
+								},
+								"version": {
+									"type": "integer",
+									"minimum": 0,
+									"maximum": 2147483647
+								},
+								"background": {
+									"type": "string",
+									"pattern": "^#[0-9a-fA-F]{6}$"
+								},
+								"elements": {
+									"maxItems": 45,
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "text"
+													},
+													"x": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"size": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 4
+													},
+													"color": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"value": {
+														"anyOf": [
+															{
+																"type": "string",
+																"maxLength": 140
+															},
+															{
+																"type": "number"
+															},
+															{
+																"type": "boolean"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"bind": {
+														"type": "string",
+														"minLength": 1,
+														"maxLength": 40
+													}
+												},
+												"required": [
+													"type",
+													"x",
+													"y"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "rect"
+													},
+													"x": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"w": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 172
+													},
+													"h": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 320
+													},
+													"filled": {
+														"type": "boolean"
+													},
+													"radius": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 10
+													},
+													"fillColor": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"color": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													}
+												},
+												"required": [
+													"type",
+													"x",
+													"y",
+													"w",
+													"h"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "line"
+													},
+													"x": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"x2": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y2": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"color": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													}
+												},
+												"required": [
+													"type",
+													"x",
+													"y",
+													"x2",
+													"y2"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "progress"
+													},
+													"x": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"w": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 172
+													},
+													"h": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 320
+													},
+													"color": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"fillColor": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"value": {
+														"anyOf": [
+															{
+																"type": "string",
+																"maxLength": 140
+															},
+															{
+																"type": "number"
+															},
+															{
+																"type": "boolean"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"bind": {
+														"type": "string",
+														"minLength": 1,
+														"maxLength": 40
+													}
+												},
+												"required": [
+													"type",
+													"x",
+													"y",
+													"w",
+													"h"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "button"
+													},
+													"x": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 171
+													},
+													"y": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 319
+													},
+													"w": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 172
+													},
+													"h": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 320
+													},
+													"size": {
+														"type": "integer",
+														"minimum": 1,
+														"maximum": 4
+													},
+													"fillColor": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"color": {
+														"type": "string",
+														"pattern": "^#[0-9a-fA-F]{6}$"
+													},
+													"value": {
+														"anyOf": [
+															{
+																"type": "string",
+																"maxLength": 140
+															},
+															{
+																"type": "number"
+															},
+															{
+																"type": "boolean"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"bind": {
+														"type": "string",
+														"minLength": 1,
+														"maxLength": 40
+													}
+												},
+												"required": [
+													"type",
+													"x",
+													"y",
+													"w",
+													"h"
+												]
+											}
+										]
+									}
+								},
+								"actions": {
+									"maxItems": 24,
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string",
+												"minLength": 1,
+												"maxLength": 48
+											},
+											"trigger": {
+												"type": "string",
+												"const": "tap"
+											},
+											"mode": {
+												"type": "string",
+												"enum": [
+													"local",
+													"remote",
+													"hybrid"
+												]
+											},
+											"event": {
+												"type": "string",
+												"maxLength": 64
+											},
+											"x": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 171
+											},
+											"y": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 319
+											},
+											"w": {
+												"type": "integer",
+												"minimum": 1,
+												"maximum": 172
+											},
+											"h": {
+												"type": "integer",
+												"minimum": 1,
+												"maximum": 320
+											},
+											"local": {
+												"oneOf": [
+													{
+														"type": "object",
+														"properties": {
+															"kind": {
+																"type": "string",
+																"const": "feedback"
+															},
+															"message": {
+																"type": "string",
+																"maxLength": 24
+															}
+														},
+														"required": [
+															"kind",
+															"message"
+														]
+													},
+													{
+														"type": "object",
+														"properties": {
+															"kind": {
+																"type": "string",
+																"const": "set_value"
+															},
+															"key": {
+																"type": "string",
+																"minLength": 1,
+																"maxLength": 40
+															},
+															"value": {
+																"anyOf": [
+																	{
+																		"type": "string",
+																		"maxLength": 140
+																	},
+																	{
+																		"type": "number"
+																	},
+																	{
+																		"type": "boolean"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"kind",
+															"key",
+															"value"
+														]
+													}
+												]
+											}
+										},
+										"required": [
+											"id",
+											"trigger",
+											"mode",
+											"x",
+											"y",
+											"w",
+											"h"
+										]
+									}
+								}
+							},
+							"required": [
+								"id",
+								"version",
+								"elements",
+								"actions"
+							]
+						}
+					},
+					"required": [
+						"type",
+						"template"
+					]
+				}
+			},
+			"data.update": {
+				"name": "data.update",
+				"title": "data.update",
+				"summary": "snapshot sustituye todos los valores; patch actualiza solo las claves enviadas.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "data.update"
+						},
+						"templateVersion": {
+							"type": "integer"
+						},
+						"strategy": {
+							"type": "string",
+							"enum": [
+								"snapshot",
+								"patch"
+							]
+						},
+						"values": {
+							"type": "object",
+							"propertyNames": {
+								"type": "string",
+								"minLength": 1,
+								"maxLength": 40
+							},
+							"additionalProperties": {
+								"anyOf": [
+									{
+										"type": "string",
+										"maxLength": 140
+									},
+									{
+										"type": "number"
+									},
+									{
+										"type": "boolean"
+									},
+									{
+										"type": "null"
+									}
+								]
+							}
+						}
+					},
+					"required": [
+						"type",
+						"templateVersion",
+						"strategy",
+						"values"
+					]
+				}
+			},
+			"ui.result": {
+				"name": "ui.result",
+				"title": "ui.result",
+				"summary": "Resultado de un touch.tap: estado, toast opcional y patch de valores.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "ui.result"
+						},
+						"eventId": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string",
+							"enum": [
+								"ok",
+								"rejected",
+								"error"
+							]
+						},
+						"toast": {
+							"type": "string"
+						},
+						"patch": {
+							"type": "object",
+							"propertyNames": {
+								"type": "string",
+								"minLength": 1,
+								"maxLength": 40
+							},
+							"additionalProperties": {
+								"anyOf": [
+									{
+										"type": "string",
+										"maxLength": 140
+									},
+									{
+										"type": "number"
+									},
+									{
+										"type": "boolean"
+									},
+									{
+										"type": "null"
+									}
+								]
+							}
+						}
+					},
+					"required": [
+						"type",
+						"eventId",
+						"status"
+					]
+				}
+			},
+			"event.ack": {
+				"name": "event.ack",
+				"title": "event.ack",
+				"summary": "Confirma un touch.tap cuyo resultado llegará más tarde.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "event.ack"
+						},
+						"eventId": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"type",
+						"eventId"
+					]
+				}
+			},
+			"display.refresh": {
+				"name": "display.refresh",
+				"title": "display.refresh",
+				"summary": "Fuerza un redibujado completo.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "display.refresh"
+						}
+					},
+					"required": [
+						"type"
+					]
+				}
+			},
+			"display.brightness": {
+				"name": "display.brightness",
+				"title": "display.brightness",
+				"summary": "Brillo en porcentaje, de 0 a 50.",
+				"x-from": "server",
+				"payload": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"const": "display.brightness"
+						},
+						"percent": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 50
+						}
+					},
+					"required": [
+						"type",
+						"percent"
+					]
+				}
+			}
+		}
+	}
+}

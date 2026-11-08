@@ -1,0 +1,2037 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"title": "MetaDisplay en atekos-pelugios: API REST",
+		"version": "1.0.0",
+		"description": "Administración de pantallas, plantillas y datos. El dispositivo no la usa: habla solo por WSS /ws/device (ver asyncapi.json). Errores: { error, message?, issues? }.",
+		"x-updated": "2026-11-08"
+	},
+	"servers": [
+		{
+			"url": "https://atekos.toxolinko.site/api/v1"
+		}
+	],
+	"security": [
+		{
+			"session": []
+		},
+		{
+			"token": []
+		}
+	],
+	"paths": {
+		"/contract/asyncapi.json": {
+			"get": {
+				"summary": "Contrato WSS del dispositivo (este documento en AsyncAPI)",
+				"security": [],
+				"responses": {
+					"200": {
+						"description": "AsyncAPI 3.0"
+					}
+				}
+			}
+		},
+		"/contract/openapi.json": {
+			"get": {
+				"summary": "Este documento",
+				"security": [],
+				"responses": {
+					"200": {
+						"description": "OpenAPI 3.1"
+					}
+				}
+			}
+		},
+		"/displays": {
+			"get": {
+				"summary": "Mis pantallas",
+				"responses": {
+					"200": {
+						"description": "Pantallas",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"$ref": "#/components/schemas/Display"
+									}
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"summary": "Dar de alta una pantalla por su id de hardware",
+				"security": [
+					{
+						"session": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CreateDisplayInput"
+							}
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Creada con la plantilla «inicio»",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Display"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Cuerpo inválido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Ya existe una pantalla con ese deviceId",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				}
+			],
+			"get": {
+				"summary": "Pantalla con su plantilla activa, plantillas y valores",
+				"responses": {
+					"200": {
+						"description": "Detalle",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DisplayDetail"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"summary": "Renombrar o cambiar la plantilla activa",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PatchDisplayInput"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Pantalla",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Display"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "El mensaje resultante pasa de 8192 bytes (message_too_large)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "La plantilla no existe (template_not_found)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"summary": "Borrar la pantalla y sus tokens ligados",
+				"security": [
+					{
+						"session": []
+					}
+				],
+				"responses": {
+					"204": {
+						"description": "Borrada"
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/template": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				}
+			],
+			"put": {
+				"summary": "Guardar una plantilla y activarla (publica template.set y el snapshot)",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DisplayTemplate"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Detalle",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DisplayDetail"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Mismo id con version igual o menor (version_not_incremented)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "El mensaje resultante pasa de 8192 bytes (message_too_large)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Plantilla inválida (invalid_template, con issues)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/templates": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				}
+			],
+			"get": {
+				"summary": "Plantillas guardadas",
+				"responses": {
+					"200": {
+						"description": "Plantillas",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"$ref": "#/components/schemas/DisplayTemplate"
+									}
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/templates/{templateId}": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				},
+				{
+					"name": "templateId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"maxLength": 64
+					}
+				}
+			],
+			"put": {
+				"summary": "Guardar una plantilla sin activarla (si es la activa, se publica)",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DisplayTemplate"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Detalle",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DisplayDetail"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "version_not_incremented",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "El mensaje resultante pasa de 8192 bytes (message_too_large)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Plantilla inválida o id distinto del de la ruta",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"summary": "Borrar una plantilla",
+				"responses": {
+					"204": {
+						"description": "Borrada"
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Es la plantilla activa",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/data": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				}
+			],
+			"put": {
+				"summary": "Reemplazar los valores (publica data.update snapshot)",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DisplayValues"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Valores",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"values": {
+											"$ref": "#/components/schemas/DisplayValues"
+										}
+									},
+									"required": [
+										"values"
+									]
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "El mensaje resultante pasa de 8192 bytes (message_too_large)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Valores inválidos (invalid_data)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"summary": "Merge de valores (publica data.update patch con las claves recibidas)",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DisplayValues"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Valores",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"values": {
+											"$ref": "#/components/schemas/DisplayValues"
+										}
+									},
+									"required": [
+										"values"
+									]
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "El mensaje resultante pasa de 8192 bytes (message_too_large)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Valores inválidos o más de 64 claves",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/events": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				},
+				{
+					"name": "limit",
+					"in": "query",
+					"schema": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 200,
+						"default": 100
+					}
+				}
+			],
+			"get": {
+				"summary": "Toques recientes, del más nuevo al más antiguo",
+				"responses": {
+					"200": {
+						"description": "Eventos",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"$ref": "#/components/schemas/DisplayEvent"
+									}
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/displays/{deviceId}/commands": {
+			"parameters": [
+				{
+					"name": "deviceId",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					}
+				}
+			],
+			"post": {
+				"summary": "Enviar un comando a la pantalla conectada",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DisplayCommand"
+							}
+						}
+					}
+				},
+				"responses": {
+					"202": {
+						"description": "Enviado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"ok": {
+											"const": true
+										}
+									}
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Sin sesión ni token válido",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Pantalla ajena, inexistente o deviceId mal formado",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "La pantalla no está conectada (device_offline)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Comando no permitido (command_not_allowed): trust.* y ota.install aún no",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiError"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"securitySchemes": {
+			"session": {
+				"type": "apiKey",
+				"in": "cookie",
+				"name": "sid",
+				"description": "Sesión de la web"
+			},
+			"token": {
+				"type": "http",
+				"scheme": "bearer",
+				"description": "Token dmt_ con displays:write (si está ligado, solo para su pantalla)"
+			}
+		},
+		"schemas": {
+			"ApiError": {
+				"type": "object",
+				"properties": {
+					"error": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"issues": {}
+				},
+				"required": [
+					"error"
+				]
+			},
+			"CreateDisplayInput": {
+				"type": "object",
+				"properties": {
+					"deviceId": {
+						"type": "string",
+						"pattern": "^md-[0-9a-fA-F]{12}$"
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					}
+				},
+				"required": [
+					"deviceId",
+					"name"
+				]
+			},
+			"PatchDisplayInput": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"activeTemplateId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				}
+			},
+			"Display": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"format": "uuid",
+						"pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+					},
+					"deviceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"activeTemplateId": {
+						"type": "string"
+					},
+					"online": {
+						"type": "boolean"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"updatedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"deviceId",
+					"name",
+					"activeTemplateId",
+					"online",
+					"createdAt",
+					"updatedAt"
+				]
+			},
+			"DisplayDetail": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"format": "uuid",
+						"pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+					},
+					"deviceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"activeTemplateId": {
+						"type": "string"
+					},
+					"online": {
+						"type": "boolean"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"updatedAt": {
+						"type": "string"
+					},
+					"template": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string",
+								"minLength": 1,
+								"maxLength": 64
+							},
+							"version": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 2147483647
+							},
+							"background": {
+								"type": "string",
+								"pattern": "^#[0-9a-fA-F]{6}$"
+							},
+							"elements": {
+								"maxItems": 45,
+								"type": "array",
+								"items": {
+									"oneOf": [
+										{
+											"type": "object",
+											"properties": {
+												"type": {
+													"type": "string",
+													"const": "text"
+												},
+												"x": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"size": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 4
+												},
+												"color": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"value": {
+													"anyOf": [
+														{
+															"type": "string",
+															"maxLength": 140
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "boolean"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"bind": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 40
+												}
+											},
+											"required": [
+												"type",
+												"x",
+												"y"
+											]
+										},
+										{
+											"type": "object",
+											"properties": {
+												"type": {
+													"type": "string",
+													"const": "rect"
+												},
+												"x": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"w": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 172
+												},
+												"h": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 320
+												},
+												"filled": {
+													"type": "boolean"
+												},
+												"radius": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 10
+												},
+												"fillColor": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"color": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												}
+											},
+											"required": [
+												"type",
+												"x",
+												"y",
+												"w",
+												"h"
+											]
+										},
+										{
+											"type": "object",
+											"properties": {
+												"type": {
+													"type": "string",
+													"const": "line"
+												},
+												"x": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"x2": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y2": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"color": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												}
+											},
+											"required": [
+												"type",
+												"x",
+												"y",
+												"x2",
+												"y2"
+											]
+										},
+										{
+											"type": "object",
+											"properties": {
+												"type": {
+													"type": "string",
+													"const": "progress"
+												},
+												"x": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"w": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 172
+												},
+												"h": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 320
+												},
+												"color": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"fillColor": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"value": {
+													"anyOf": [
+														{
+															"type": "string",
+															"maxLength": 140
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "boolean"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"bind": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 40
+												}
+											},
+											"required": [
+												"type",
+												"x",
+												"y",
+												"w",
+												"h"
+											]
+										},
+										{
+											"type": "object",
+											"properties": {
+												"type": {
+													"type": "string",
+													"const": "button"
+												},
+												"x": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 171
+												},
+												"y": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 319
+												},
+												"w": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 172
+												},
+												"h": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 320
+												},
+												"size": {
+													"type": "integer",
+													"minimum": 1,
+													"maximum": 4
+												},
+												"fillColor": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"color": {
+													"type": "string",
+													"pattern": "^#[0-9a-fA-F]{6}$"
+												},
+												"value": {
+													"anyOf": [
+														{
+															"type": "string",
+															"maxLength": 140
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "boolean"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"bind": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 40
+												}
+											},
+											"required": [
+												"type",
+												"x",
+												"y",
+												"w",
+												"h"
+											]
+										}
+									]
+								}
+							},
+							"actions": {
+								"maxItems": 24,
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 48
+										},
+										"trigger": {
+											"type": "string",
+											"const": "tap"
+										},
+										"mode": {
+											"type": "string",
+											"enum": [
+												"local",
+												"remote",
+												"hybrid"
+											]
+										},
+										"event": {
+											"type": "string",
+											"maxLength": 64
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"w": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 172
+										},
+										"h": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 320
+										},
+										"local": {
+											"oneOf": [
+												{
+													"type": "object",
+													"properties": {
+														"kind": {
+															"type": "string",
+															"const": "feedback"
+														},
+														"message": {
+															"type": "string",
+															"maxLength": 24
+														}
+													},
+													"required": [
+														"kind",
+														"message"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"kind": {
+															"type": "string",
+															"const": "set_value"
+														},
+														"key": {
+															"type": "string",
+															"minLength": 1,
+															"maxLength": 40
+														},
+														"value": {
+															"anyOf": [
+																{
+																	"type": "string",
+																	"maxLength": 140
+																},
+																{
+																	"type": "number"
+																},
+																{
+																	"type": "boolean"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														}
+													},
+													"required": [
+														"kind",
+														"key",
+														"value"
+													]
+												}
+											]
+										}
+									},
+									"required": [
+										"id",
+										"trigger",
+										"mode",
+										"x",
+										"y",
+										"w",
+										"h"
+									]
+								}
+							}
+						},
+						"required": [
+							"id",
+							"version",
+							"elements",
+							"actions"
+						]
+					},
+					"templates": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"version": {
+									"type": "integer"
+								}
+							},
+							"required": [
+								"id",
+								"version"
+							]
+						}
+					},
+					"values": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 40
+						},
+						"additionalProperties": {
+							"anyOf": [
+								{
+									"type": "string",
+									"maxLength": 140
+								},
+								{
+									"type": "number"
+								},
+								{
+									"type": "boolean"
+								},
+								{
+									"type": "null"
+								}
+							]
+						}
+					}
+				},
+				"required": [
+					"id",
+					"deviceId",
+					"name",
+					"activeTemplateId",
+					"online",
+					"createdAt",
+					"updatedAt",
+					"template",
+					"templates",
+					"values"
+				]
+			},
+			"DisplayTemplate": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"version": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 2147483647
+					},
+					"background": {
+						"type": "string",
+						"pattern": "^#[0-9a-fA-F]{6}$"
+					},
+					"elements": {
+						"maxItems": 45,
+						"type": "array",
+						"items": {
+							"oneOf": [
+								{
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "text"
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"size": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 4
+										},
+										"color": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"value": {
+											"anyOf": [
+												{
+													"type": "string",
+													"maxLength": 140
+												},
+												{
+													"type": "number"
+												},
+												{
+													"type": "boolean"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"bind": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 40
+										}
+									},
+									"required": [
+										"type",
+										"x",
+										"y"
+									]
+								},
+								{
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "rect"
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"w": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 172
+										},
+										"h": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 320
+										},
+										"filled": {
+											"type": "boolean"
+										},
+										"radius": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 10
+										},
+										"fillColor": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"color": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										}
+									},
+									"required": [
+										"type",
+										"x",
+										"y",
+										"w",
+										"h"
+									]
+								},
+								{
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "line"
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"x2": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y2": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"color": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										}
+									},
+									"required": [
+										"type",
+										"x",
+										"y",
+										"x2",
+										"y2"
+									]
+								},
+								{
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "progress"
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"w": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 172
+										},
+										"h": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 320
+										},
+										"color": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"fillColor": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"value": {
+											"anyOf": [
+												{
+													"type": "string",
+													"maxLength": 140
+												},
+												{
+													"type": "number"
+												},
+												{
+													"type": "boolean"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"bind": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 40
+										}
+									},
+									"required": [
+										"type",
+										"x",
+										"y",
+										"w",
+										"h"
+									]
+								},
+								{
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "button"
+										},
+										"x": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 171
+										},
+										"y": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 319
+										},
+										"w": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 172
+										},
+										"h": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 320
+										},
+										"size": {
+											"type": "integer",
+											"minimum": 1,
+											"maximum": 4
+										},
+										"fillColor": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"color": {
+											"type": "string",
+											"pattern": "^#[0-9a-fA-F]{6}$"
+										},
+										"value": {
+											"anyOf": [
+												{
+													"type": "string",
+													"maxLength": 140
+												},
+												{
+													"type": "number"
+												},
+												{
+													"type": "boolean"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"bind": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 40
+										}
+									},
+									"required": [
+										"type",
+										"x",
+										"y",
+										"w",
+										"h"
+									]
+								}
+							]
+						}
+					},
+					"actions": {
+						"maxItems": 24,
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 48
+								},
+								"trigger": {
+									"type": "string",
+									"const": "tap"
+								},
+								"mode": {
+									"type": "string",
+									"enum": [
+										"local",
+										"remote",
+										"hybrid"
+									]
+								},
+								"event": {
+									"type": "string",
+									"maxLength": 64
+								},
+								"x": {
+									"type": "integer",
+									"minimum": 0,
+									"maximum": 171
+								},
+								"y": {
+									"type": "integer",
+									"minimum": 0,
+									"maximum": 319
+								},
+								"w": {
+									"type": "integer",
+									"minimum": 1,
+									"maximum": 172
+								},
+								"h": {
+									"type": "integer",
+									"minimum": 1,
+									"maximum": 320
+								},
+								"local": {
+									"oneOf": [
+										{
+											"type": "object",
+											"properties": {
+												"kind": {
+													"type": "string",
+													"const": "feedback"
+												},
+												"message": {
+													"type": "string",
+													"maxLength": 24
+												}
+											},
+											"required": [
+												"kind",
+												"message"
+											]
+										},
+										{
+											"type": "object",
+											"properties": {
+												"kind": {
+													"type": "string",
+													"const": "set_value"
+												},
+												"key": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 40
+												},
+												"value": {
+													"anyOf": [
+														{
+															"type": "string",
+															"maxLength": 140
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "boolean"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"kind",
+												"key",
+												"value"
+											]
+										}
+									]
+								}
+							},
+							"required": [
+								"id",
+								"trigger",
+								"mode",
+								"x",
+								"y",
+								"w",
+								"h"
+							]
+						}
+					}
+				},
+				"required": [
+					"id",
+					"version",
+					"elements",
+					"actions"
+				]
+			},
+			"DisplayValues": {
+				"type": "object",
+				"propertyNames": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 40
+				},
+				"additionalProperties": {
+					"anyOf": [
+						{
+							"type": "string",
+							"maxLength": 140
+						},
+						{
+							"type": "number"
+						},
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"DisplayEvent": {
+				"type": "object",
+				"properties": {
+					"ts": {
+						"type": "string"
+					},
+					"eventId": {
+						"type": "string"
+					},
+					"actionId": {
+						"type": "string"
+					},
+					"name": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"x": {
+						"type": "integer"
+					},
+					"y": {
+						"type": "integer"
+					},
+					"templateId": {
+						"type": "string"
+					},
+					"templateVersion": {
+						"type": "integer"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"ok",
+							"rejected",
+							"error"
+						]
+					},
+					"toast": {
+						"type": [
+							"string",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"ts",
+					"eventId",
+					"actionId",
+					"name",
+					"x",
+					"y",
+					"templateId",
+					"templateVersion",
+					"status",
+					"toast"
+				]
+			},
+			"DisplayCommand": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "display.refresh"
+							}
+						},
+						"required": [
+							"type"
+						]
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "display.brightness"
+							},
+							"percent": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 50
+							}
+						},
+						"required": [
+							"type",
+							"percent"
+						]
+					}
+				]
+			}
+		}
+	}
+}

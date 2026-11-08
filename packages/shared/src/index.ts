@@ -381,10 +381,11 @@ export type DisplayEvent = z.infer<typeof DisplayEvent>
 
 // Solo display.* por ahora: trust.* y ota.install quedan fuera hasta homologar el hardware (DISENO §1)
 export const DISPLAY_COMMANDS = ['display.refresh', 'display.brightness'] as const
-export const DisplayCommand = z.discriminatedUnion('type', [
+const COMMANDS = [
 	z.object({ type: z.literal('display.refresh') }),
 	z.object({ type: z.literal('display.brightness'), percent: z.number().int().min(0).max(50) }),
-])
+] as const
+export const DisplayCommand = z.discriminatedUnion('type', COMMANDS)
 export type DisplayCommand = z.infer<typeof DisplayCommand>
 
 // WSS /ws/device: dispositivo → servidor
@@ -423,10 +424,23 @@ export const DisplayClientMessage = z.discriminatedUnion('type', [
 ])
 export type DisplayClientMessage = z.infer<typeof DisplayClientMessage>
 
-// WSS /ws/device: servidor → dispositivo
-export type DisplayServerMessage =
-	| { type: 'template.set'; template: DisplayTemplate }
-	| { type: 'data.update'; templateVersion: number; strategy: 'snapshot' | 'patch'; values: DisplayValues }
-	| { type: 'ui.result'; eventId: string; status: 'ok' | 'rejected' | 'error'; toast?: string; patch?: DisplayValues }
-	| { type: 'event.ack'; eventId: string }
-	| DisplayCommand
+// WSS /ws/device: servidor → dispositivo. Esquema (no solo tipo) porque de aquí sale el contrato publicado.
+export const DisplayServerMessage = z.discriminatedUnion('type', [
+	z.object({ type: z.literal('template.set'), template: DisplayTemplate }),
+	z.object({
+		type: z.literal('data.update'),
+		templateVersion: z.number().int(),
+		strategy: z.enum(['snapshot', 'patch']),
+		values: DisplayValues,
+	}),
+	z.object({
+		type: z.literal('ui.result'),
+		eventId: z.string(),
+		status: z.enum(['ok', 'rejected', 'error']),
+		toast: z.string().optional(),
+		patch: DisplayValues.optional(),
+	}),
+	z.object({ type: z.literal('event.ack'), eventId: z.string() }),
+	...COMMANDS,
+])
+export type DisplayServerMessage = z.infer<typeof DisplayServerMessage>
