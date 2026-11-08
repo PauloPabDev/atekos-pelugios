@@ -8,6 +8,7 @@ import { loadEnv } from '../src/config/env'
 import { createContainer } from '../src/container'
 import { buildApp } from '../src/app'
 import { attachWebSocket } from '../src/ws/server'
+import { attachDeviceWebSocket } from '../src/ws/device-server'
 
 export async function startStack() {
 	const [pg, mongo, redis] = await Promise.all([
@@ -25,13 +26,14 @@ export async function startStack() {
 	const c = await createContainer(env, pino({ level: 'silent' }))
 	const server = http.createServer(buildApp(c))
 	const ws = await attachWebSocket(server, c)
+	const deviceWs = await attachDeviceWebSocket(server, c)
 	await new Promise<void>((r) => server.listen(0, r))
 	const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 	return {
 		c,
 		url,
 		stop: async () => {
-			await ws.close()
+			await Promise.all([ws.close(), deviceWs.close()])
 			server.close()
 			await c.close()
 			await Promise.all([pg.stop(), mongo.stop(), redis.stop()])

@@ -1,0 +1,129 @@
+{
+  "id": "goal.v1",
+  "version": 1,
+  "background": "#090D18",
+  "elements": [
+    {
+      "type": "text",
+      "x": 10,
+      "y": 14,
+      "size": 2,
+      "color": "#FFFFFF",
+      "value": "META"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 48,
+      "size": 1,
+      "color": "#B2B9D2",
+      "value": "OBJETIVO"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 67,
+      "size": 2,
+      "color": "#B6A3FF",
+      "bind": "targetText"
+    },
+    {
+      "type": "line",
+      "x": 10,
+      "y": 99,
+      "x2": 160,
+      "y2": 99,
+      "color": "#586180"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 119,
+      "size": 1,
+      "color": "#B2B9D2",
+      "value": "ACUMULADO"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 143,
+      "size": 2,
+      "color": "#FFFFFF",
+      "bind": "collectedText"
+    },
+    {
+      "type": "progress",
+      "x": 10,
+      "y": 188,
+      "w": 152,
+      "h": 13,
+      "color": "#D8D9E5",
+      "fillColor": "#9568FF",
+      "bind": "progress"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 215,
+      "size": 1,
+      "color": "#FFFFFF",
+      "bind": "daysText"
+    },
+    {
+      "type": "text",
+      "x": 10,
+      "y": 236,
+      "size": 1,
+      "color": "#B2B9D2",
+      "bind": "percentageText"
+    },
+    {
+      "type": "button",
+      "x": 10,
+      "y": 271,
+      "w": 152,
+      "h": 36,
+      "size": 1,
+      "color": "#FFFFFF",
+      "fillColor": "#6240B4",
+      "value": "ACTUALIZAR"
+    },
+    {
+      "type": "button",
+      "x": 48,
+      "y": 247,
+      "w": 76,
+      "h": 20,
+      "size": 1,
+      "color": "#FFFFFF",
+      "fillColor": "#26395A",
+      "value": "ESTADO"
+    }
+  ],
+  "actions": [
+    {
+      "id": "refresh",
+      "trigger": "tap",
+      "x": 10,
+      "y": 271,
+      "w": 152,
+      "h": 36,
+      "mode": "hybrid",
+      "event": "data.refresh",
+      "local": {
+        "kind": "feedback",
+        "message": "Actualizando..."
+      }
+    },
+    {
+      "id": "go-status",
+      "trigger": "tap",
+      "x": 48,
+      "y": 247,
+      "w": 76,
+      "h": 20,
+      "mode": "remote",
+      "event": "screen.status.v1"
+    }
+  ]
+}

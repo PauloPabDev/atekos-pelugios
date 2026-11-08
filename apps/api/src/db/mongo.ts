@@ -14,4 +14,10 @@ export async function ensureMongo(db: Db) {
 			timeseries: { timeField: 'ts', metaField: 'deviceId', granularity: 'minutes' },
 			expireAfterSeconds: 365 * DAY,
 		})
+	// MetaDisplay: toques y auditoría de comandos (docs/metadisplay/DISENO.md §2)
+	if (!names.has('display_events'))
+		await db.createCollection('display_events', {
+			timeseries: { timeField: 'ts', metaField: 'displayId', granularity: 'seconds' },
+			expireAfterSeconds: 90 * DAY,
+		})
 }

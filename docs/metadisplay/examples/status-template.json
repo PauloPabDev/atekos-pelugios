@@ -1,0 +1,16 @@
+{
+  "id":"status.v1",
+  "version":2,
+  "background":"#06131B",
+  "elements":[
+    {"type":"text","x":12,"y":22,"size":2,"value":"ESTADO","color":"#FFFFFF"},
+    {"type":"text","x":12,"y":83,"size":1,"value":"SERVIDOR","color":"#95B2CA"},
+    {"type":"text","x":12,"y":110,"size":2,"bind":"serverStatus","color":"#66F3BF"},
+    {"type":"text","x":12,"y":170,"size":1,"value":"ULTIMO DATO","color":"#95B2CA"},
+    {"type":"text","x":12,"y":195,"size":1,"bind":"daysText","color":"#FFFFFF"},
+    {"type":"button","x":12,"y":268,"w":148,"h":37,"size":1,"value":"VOLVER A META","color":"#FFFFFF","fillColor":"#245363"}
+  ],
+  "actions":[
+    {"id":"go-back","trigger":"tap","x":12,"y":268,"w":148,"h":37,"mode":"remote","event":"screen.goal.v1"}
+  ]
+}

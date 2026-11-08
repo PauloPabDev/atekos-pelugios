@@ -12,10 +12,13 @@ export class CreateToken {
 	async execute(userId: string, input: CreateTokenInput): Promise<CreatedApiToken> {
 		const deviceId = input.deviceId ?? null
 		if (deviceId && !(await this.deps.repo.deviceBelongsTo(deviceId, userId))) throw NotFound('Dispositivo')
+		const displayId = input.displayId ?? null
+		if (displayId && !(await this.deps.repo.displayBelongsTo(displayId, userId))) throw NotFound('Pantalla')
 		const { plain, prefix, hash } = this.deps.hasher.create()
 		const token = await this.deps.repo.create({
 			userId,
 			deviceId,
+			displayId,
 			name: input.name,
 			prefix,
 			tokenHash: hash,

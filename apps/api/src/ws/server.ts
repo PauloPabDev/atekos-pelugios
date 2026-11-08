@@ -5,6 +5,7 @@ import type { Container } from '../container'
 import { resolveActor } from '../shared/auth'
 import { AppError } from '../shared/errors'
 import { canRead, type Actor } from '../modules/devices/domain/policy'
+import { onUpgrade } from './upgrade'
 
 // Async: resuelve cuando Redis confirma el SUBSCRIBE del bus, así ningún cambio posterior se pierde.
 export async function attachWebSocket(server: Server, c: Container) {
@@ -21,9 +22,8 @@ export async function attachWebSocket(server: Server, c: Container) {
 		return { type: 'error', code: 'internal', message: 'Error interno' }
 	}
 
-	server.on('upgrade', async (req, socket, head) => {
+	onUpgrade(server, '/ws', async (req, socket, head) => {
 		const url = new URL(req.url ?? '/', 'http://x')
-		if (url.pathname !== '/ws') return socket.destroy()
 		// Node quita sus listeners al hacer upgrade: sin este, un RST del cliente mientras se resuelve el actor tumba el proceso.
 		const onSocketError = () => socket.destroy()
 		socket.on('error', onSocketError)
@@ -44,6 +44,8 @@ export async function attachWebSocket(server: Server, c: Container) {
 	function onConnection(ws: WebSocket, actor: Actor) {
 		const mine = new Set<string>()
 		let alive = true
+		// Sin listener, un 'error' del socket (p. ej. trama > maxPayload, que ws ya cierra con 1009) tumba el proceso.
+		ws.on('error', (err) => c.logger.warn({ err }, 'error en /ws'))
 		ws.on('pong', () => (alive = true))
 		const heartbeat = setInterval(() => {
 			if (!alive) return ws.terminate() // ESP sin WiFi: se limpia solo

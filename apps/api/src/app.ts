@@ -11,6 +11,7 @@ import { authRoutes } from './modules/auth/infrastructure/http-routes'
 import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
 import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
 import { telemetryRoutes } from './modules/telemetry/infrastructure/http-routes'
+import { displayRoutes } from './modules/displays/infrastructure/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -63,6 +64,7 @@ export function buildApp(c: Container) {
 	api.use('/tokens', tokenRoutes(c))
 	api.use(deviceRoutes(c))
 	api.use(telemetryRoutes(c))
+	api.use('/displays', displayRoutes(c))
 
 	app.use('/api/v1', api)
 	app.use('/api', () => {
@@ -74,7 +76,8 @@ export function buildApp(c: Container) {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express solo trata como handler de error a los de 4 parámetros
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
-	if (err instanceof AppError) return res.status(err.status).json({ error: err.code, message: err.message })
+	if (err instanceof AppError)
+		return res.status(err.status).json({ error: err.code, message: err.message, issues: err.issues })
 	if (err instanceof ZodError) return res.status(400).json({ error: 'validation', issues: err.issues })
 	// body-parser lanza http-errors 4xx con `expose` (JSON mal formado, cuerpo > 32kb): son culpa del cliente, no 500.
 	if (err instanceof Error && 'expose' in err && err.expose && 'status' in err && typeof err.status === 'number')

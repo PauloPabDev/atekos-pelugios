@@ -36,6 +36,23 @@ import { makeMongoDeviceEventLog } from './modules/devices/infrastructure/mongo-
 import { makePgDeviceRepository } from './modules/devices/infrastructure/pg-device-repository'
 import { makeRedisDeviceCache } from './modules/devices/infrastructure/redis-device-cache'
 import { makeRedisDeviceEventBus } from './modules/devices/infrastructure/redis-device-event-bus'
+import { CreateDisplay } from './modules/displays/application/create-display'
+import { DeleteDisplay } from './modules/displays/application/delete-display'
+import { DeleteTemplate } from './modules/displays/application/delete-template'
+import { GetDisplay } from './modules/displays/application/get-display'
+import { ListDisplays } from './modules/displays/application/list-displays'
+import { ListEvents as ListDisplayEvents } from './modules/displays/application/list-events'
+import { ListTemplates } from './modules/displays/application/list-templates'
+import { PatchData as PatchDisplayData } from './modules/displays/application/patch-data'
+import { PatchDisplay } from './modules/displays/application/patch-display'
+import { PutData } from './modules/displays/application/put-data'
+import { PutTemplate } from './modules/displays/application/put-template'
+import { PutTemplateById } from './modules/displays/application/put-template-by-id'
+import { SendCommand } from './modules/displays/application/send-command'
+import { makeMongoDisplayEventLog } from './modules/displays/infrastructure/mongo-display-event-log'
+import { makePgDisplayRepository } from './modules/displays/infrastructure/pg-display-repository'
+import { makeRedisDisplayOutbox } from './modules/displays/infrastructure/redis-display-outbox'
+import { makeRedisDisplayPresence } from './modules/displays/infrastructure/redis-display-presence'
 import { IngestTelemetry } from './modules/telemetry/application/ingest-telemetry'
 import { QueryTelemetry } from './modules/telemetry/application/query-telemetry'
 import { makeMongoTelemetryRepository } from './modules/telemetry/infrastructure/mongo-telemetry-repository'
@@ -76,6 +93,13 @@ export async function createContainer(env: Env, logger: Logger) {
 	const getDevice = new GetDevice({ repo: deviceRepo, cache })
 	const telemetryRepo = makeMongoTelemetryRepository(mongo)
 
+	const dd = {
+		repo: makePgDisplayRepository(db),
+		presence: makeRedisDisplayPresence(redis),
+		outbox: makeRedisDisplayOutbox(redis, sub),
+		eventLog: makeMongoDisplayEventLog(mongo),
+	}
+
 	return {
 		env,
 		logger,
@@ -111,6 +135,23 @@ export async function createContainer(env: Env, logger: Logger) {
 			getDataKey: new GetDataKey({ get: getDevice }),
 			listEvents: new ListEvents({ get: getDevice, eventLog }),
 			delete: new DeleteDevice({ repo: deviceRepo, cache, eventLog, redis, logger }),
+		},
+		// MetaDisplay (docs/metadisplay/DISENO.md). repo/presence/outbox/eventLog los usa también /ws/device.
+		displays: {
+			...dd,
+			create: new CreateDisplay(dd),
+			list: new ListDisplays(dd),
+			get: new GetDisplay(dd),
+			patch: new PatchDisplay(dd),
+			delete: new DeleteDisplay({ ...dd, redis }),
+			putTemplate: new PutTemplate(dd),
+			putTemplateById: new PutTemplateById(dd),
+			listTemplates: new ListTemplates(dd),
+			deleteTemplate: new DeleteTemplate(dd),
+			putData: new PutData(dd),
+			patchData: new PatchDisplayData(dd),
+			listEvents: new ListDisplayEvents(dd),
+			sendCommand: new SendCommand(dd),
 		},
 		telemetry: {
 			ingest: new IngestTelemetry({ get: getDevice, repo: telemetryRepo }),

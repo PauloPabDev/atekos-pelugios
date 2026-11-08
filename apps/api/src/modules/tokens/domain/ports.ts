@@ -6,15 +6,18 @@ export type VerifiedToken = {
 	userId: string
 	scopes: Scope[]
 	deviceId: string | null
+	displayId: string | null
 	expiresAt: string | null
 }
 
 export interface TokenRepository {
 	/** Consulta `devices` directamente: el módulo devices llega en la fase 6. */
 	deviceBelongsTo(deviceId: string, userId: string): Promise<boolean>
+	displayBelongsTo(displayId: string, userId: string): Promise<boolean>
 	create(t: {
 		userId: string
 		deviceId: string | null
+		displayId: string | null
 		name: string
 		prefix: string
 		tokenHash: string

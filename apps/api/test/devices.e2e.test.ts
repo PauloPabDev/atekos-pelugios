@@ -145,6 +145,20 @@ describe('ws', () => {
 		ws.close()
 	})
 
+	it('una trama de más de 32 KB cierra ese socket con 1009 y la API sigue viva', async () => {
+		const ws = await connect()
+		const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) })
+		ws.send('x'.repeat(33 * 1024))
+		const [code] = await closed
+		expect(code).toBe(1009)
+		await request(s.url).get(api('/health')).expect(200)
+		const other = await connect()
+		const pong = nextMessage(other, 'pong')
+		sendJson(other, { type: 'ping' })
+		expect(await pong).toEqual({ type: 'pong' })
+		other.close()
+	})
+
 	it('un token ligado al dispositivo A no puede hacer toggle de B por WS', async () => {
 		const { agent } = await registered()
 		const devA = await create(agent)

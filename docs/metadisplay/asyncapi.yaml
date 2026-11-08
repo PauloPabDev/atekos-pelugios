@@ -1,0 +1,93 @@
+asyncapi: 3.0.0
+info:
+  title: MetaDisplay C6 Touch WebSocket Protocol
+  version: 1.0.0
+  description: Protocolo binario no permitido; mensajes JSON UTF-8 sobre WSS con Bearer en handshake.
+servers:
+  customer:
+    host: display.example.com
+    protocol: wss
+    pathname: /ws/device
+    security:
+      - $ref: '#/components/securitySchemes/deviceBearer'
+channels:
+  deviceSocket:
+    address: /ws/device
+    messages:
+      hello: {$ref: '#/components/messages/DeviceHello'}
+      templateSet: {$ref: '#/components/messages/TemplateSet'}
+      dataUpdate: {$ref: '#/components/messages/DataUpdate'}
+      touchTap: {$ref: '#/components/messages/TouchTap'}
+      uiResult: {$ref: '#/components/messages/UiResult'}
+operations:
+  receiveScreen:
+    action: receive
+    channel: {$ref: '#/channels/deviceSocket'}
+    summary: Servidor publica template.set, data.update, ui.result y comandos
+  sendTouch:
+    action: send
+    channel: {$ref: '#/channels/deviceSocket'}
+    summary: ESP32 publica device.hello, touch.tap y ACKs
+components:
+  securitySchemes:
+    deviceBearer:
+      type: http
+      scheme: bearer
+  messages:
+    DeviceHello:
+      name: device.hello
+      payload:
+        type: object
+        required: [type, protocol, deviceId, display]
+        properties:
+          type: {const: device.hello}
+          protocol: {const: 1}
+          deviceId: {type: string}
+          display:
+            type: object
+            properties:
+              width: {const: 172}
+              height: {const: 320}
+              touch: {const: true}
+    TemplateSet:
+      name: template.set
+      payload:
+        type: object
+        required: [type, template]
+        properties:
+          type: {const: template.set}
+          template: {type: object}
+    DataUpdate:
+      name: data.update
+      payload:
+        type: object
+        required: [type, templateVersion, strategy, values]
+        properties:
+          type: {const: data.update}
+          templateVersion: {type: integer}
+          strategy: {enum: [snapshot, patch]}
+          values: {type: object}
+    TouchTap:
+      name: touch.tap
+      payload:
+        type: object
+        required: [type, eventId, deviceId, actionId, x, y, templateVersion]
+        properties:
+          type: {const: touch.tap}
+          eventId: {type: string}
+          deviceId: {type: string}
+          actionId: {type: string}
+          x: {type: integer}
+          y: {type: integer}
+          templateVersion: {type: integer}
+    UiResult:
+      name: ui.result
+      payload:
+        type: object
+        required: [type, eventId, status]
+        properties:
+          type: {const: ui.result}
+          eventId: {type: string}
+          status: {enum: [ok, rejected, error]}
+          toast: {type: string}
+          patch: {type: object}

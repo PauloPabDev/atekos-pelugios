@@ -8,6 +8,13 @@
       "when": 1794114857141,
       "tag": "0000_fat_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794123745802,
+      "tag": "0001_noisy_silver_sable",
+      "breakpoints": true
     }
   ]
 }

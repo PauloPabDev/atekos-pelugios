@@ -5,6 +5,7 @@ import { loadEnv } from './config/env'
 import { createContainer } from './container'
 import { buildApp } from './app'
 import { attachWebSocket } from './ws/server'
+import { attachDeviceWebSocket } from './ws/device-server'
 
 const env = (() => {
 	try {
@@ -20,6 +21,7 @@ const logger = pino()
 const c = await createContainer(env, logger)
 const server = http.createServer(buildApp(c))
 const ws = await attachWebSocket(server, c)
+const deviceWs = await attachDeviceWebSocket(server, c)
 server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'api escuchando'))
 
 const shutdown = (signal: string) => {
@@ -30,6 +32,7 @@ const shutdown = (signal: string) => {
 	})
 	// Los sockets WS cuentan como conexiones abiertas: hasta cerrarlos, server.close no llama a su callback.
 	void ws.close()
+	void deviceWs.close()
 }
 process.once('SIGTERM', shutdown)
 process.once('SIGINT', shutdown)
