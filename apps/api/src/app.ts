@@ -5,6 +5,9 @@ import { pinoHttp } from 'pino-http'
 import { ZodError } from 'zod'
 import type { Container } from './container'
 import { AppError, NotFound, UnsupportedMediaType } from './shared/errors'
+import { authenticate } from './shared/auth'
+import { authRoutes } from './modules/auth/infrastructure/http-routes'
+import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -42,6 +45,10 @@ export function buildApp(c: Container) {
 		if (failed.length) return res.status(503).json({ status: 'error', failed })
 		res.json({ status: 'ok' })
 	})
+	// Después de /health: el healthcheck no depende de Redis para resolver el actor.
+	api.use(authenticate(c))
+	api.use('/auth', authRoutes(c))
+	api.use('/tokens', tokenRoutes(c))
 
 	app.use('/api/v1', api)
 	app.use('/api', () => {
