@@ -12,7 +12,14 @@
 	handle /ws/device {
 		reverse_proxy api:3000
 	}
+	# Descubrimiento OAuth del MCP (RFC 8414 y RFC 9728): tiene que estar en la raíz del dominio (docs/MCP.md).
+	handle /.well-known/oauth-* {
+		reverse_proxy api:3000
+	}
 	handle {
+		# Nadie puede enmarcar la web: protege la pantalla de consentimiento OAuth del clickjacking.
+		header X-Frame-Options DENY
+		header Content-Security-Policy "frame-ancestors 'none'"
 		root * /srv
 		try_files {path} /index.html
 		file_server

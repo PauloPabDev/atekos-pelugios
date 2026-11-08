@@ -46,6 +46,16 @@ docker compose exec -T mongo sh -c 'mongodump --archive -u "$MONGO_INITDB_ROOT_U
 
 > **Cuidado:** `docker compose … down` conserva los datos, pero `down -v` borra los volúmenes (PostgreSQL, MongoDB, Redis y los certificados de Caddy) y no hay vuelta atrás.
 
+## IA (MCP)
+
+La API trae un servidor MCP en `/api/v1/mcp` con OAuth 2.1, para que un asistente (Claude Code, claude.ai, Cursor…) cree dispositivos y pantallas y actualice sus datos. Para activarlo se pone `PUBLIC_URL` (dev y compose ya lo traen; en Coolify hay que añadirlo). Luego se conecta el cliente:
+
+```bash
+claude mcp add --transport http --scope user atekos https://atekos.toxolinko.site/api/v1/mcp
+```
+
+Funcionamiento, herramientas, permisos y seguridad: [`docs/MCP.md`](docs/MCP.md).
+
 ## Firmware
 
 El contrato para el ESP8266 (token ligado al dispositivo, polling o WebSocket) está en la [§13 de la guía](docs/GUIA_REPLICA_DOMOTICA.md#13-contrato-para-el-firmware-esp8266).

@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
-import type { ApiToken, CreateTokenInput, Display } from '@atekos/shared'
+import type { ApiToken, CreateTokenInput, Display, OAuthGrant } from '@atekos/shared'
 import { mockFetch, renderApp, user } from '../test/utils'
 
 test('tras crear, el token en claro aparece y no queda guardado en la lista', async () => {
@@ -24,6 +24,7 @@ test('tras crear, el token en claro aparece y no queda guardado en la lista', as
 		'GET /api/v1/devices': () => ({ body: [] }),
 		'GET /api/v1/displays': () => ({ body: [] }),
 		'GET /api/v1/tokens': () => ({ body: listed }),
+		'GET /api/v1/oauth/grants': () => ({ body: [] }),
 		'POST /api/v1/tokens': () => {
 			listed.push(token)
 			return { status: 201, body: { ...token, token: plain } }
@@ -64,6 +65,7 @@ test('display:connect sin pantalla muestra la regla y no envía; con pantalla en
 		'GET /api/v1/devices': () => ({ body: [] }),
 		'GET /api/v1/displays': () => ({ body: [display] }),
 		'GET /api/v1/tokens': () => ({ body: listed }),
+		'GET /api/v1/oauth/grants': () => ({ body: [] }),
 		'POST /api/v1/tokens': (init) => {
 			const input = JSON.parse(String(init?.body)) as CreateTokenInput
 			const token: ApiToken = {
@@ -108,4 +110,38 @@ test('display:connect sin pantalla muestra la regla y no envía; con pantalla en
 	const list = screen.getByRole('list', { name: 'Tokens' })
 	expect(await within(list).findByText('Meta')).toBeInTheDocument()
 	expect(list).toHaveTextContent('Pantalla')
+})
+
+test('apps conectadas: lista los grants y Revocar llama a DELETE y recarga la lista', async () => {
+	const grant: OAuthGrant = {
+		id: crypto.randomUUID(),
+		clientName: 'Claude',
+		scopes: ['devices:read', 'displays:write'],
+		createdAt: new Date().toISOString(),
+		lastUsedAt: null,
+	}
+	let grants = [grant]
+	const fetch = mockFetch({
+		'GET /api/v1/auth/me': () => ({ body: user }),
+		'GET /api/v1/devices': () => ({ body: [] }),
+		'GET /api/v1/displays': () => ({ body: [] }),
+		'GET /api/v1/tokens': () => ({ body: [] }),
+		'GET /api/v1/oauth/grants': () => ({ body: grants }),
+		[`DELETE /api/v1/oauth/grants/${grant.id}`]: () => {
+			grants = []
+			return { status: 204 }
+		},
+	})
+	renderApp('/tokens')
+
+	const list = await screen.findByRole('list', { name: 'Apps conectadas' })
+	expect(await within(list).findByText('Claude')).toBeInTheDocument()
+	expect(list).toHaveTextContent('devices:read, displays:write')
+	expect(list).toHaveTextContent('nunca')
+
+	await userEvent.click(within(list).getByRole('button', { name: 'Revocar Claude' }))
+
+	expect(await screen.findByText('Ninguna app conectada.')).toBeInTheDocument()
+	expect(fetch).toHaveBeenCalledWith(`/api/v1/oauth/grants/${grant.id}`, expect.objectContaining({ method: 'DELETE' }))
+	expect(list).not.toHaveTextContent('Claude')
 })

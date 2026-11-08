@@ -9,6 +9,10 @@
 	handle /ws/device {
 		reverse_proxy api:3000
 	}
+	# Descubrimiento OAuth del MCP (RFC 8414 y RFC 9728): tiene que estar en la raíz del dominio (docs/MCP.md).
+	handle /.well-known/oauth-* {
+		reverse_proxy api:3000
+	}
 	handle {
 		reverse_proxy web:5173
 	}

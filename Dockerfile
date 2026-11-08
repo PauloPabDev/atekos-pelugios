@@ -1,6 +1,7 @@
 # Imagen única para Coolify: Postgres 17, MongoDB 8.0, Redis 8.2, la API y Caddy con la web en un solo contenedor.
 # Las bases escuchan solo en 127.0.0.1; lo único expuesto es Caddy en :8080 (Coolify pone el HTTPS delante).
 # Datos persistentes en /data: monta ahí un volumen. Variable obligatoria: TOKEN_PEPPER (≥ 32 caracteres).
+# PUBLIC_URL (https://tu-dominio) activa el MCP con OAuth (docs/MCP.md); sin ella la API arranca sin MCP.
 # Base Debian (no Alpine): MongoDB no publica binarios para musl y argon2 debe compilarse con la misma libc que corre.
 
 FROM node:24-bookworm-slim AS base

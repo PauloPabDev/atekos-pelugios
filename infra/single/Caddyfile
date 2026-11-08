@@ -12,7 +12,8 @@
 	encode zstd gzip
 	header -Server
 
-	@api path /api/* /ws /ws/device
+	# /.well-known/oauth-*: descubrimiento OAuth del MCP, en la raíz del dominio (docs/MCP.md).
+	@api path /api/* /ws /ws/device /.well-known/oauth-*
 	handle @api {
 		reverse_proxy 127.0.0.1:3000 {
 			# La API tiene trust proxy = 1: le llega solo la IP real del cliente, no la del proxy de Coolify.
@@ -21,6 +22,9 @@
 		}
 	}
 	handle {
+		# Nadie puede enmarcar la web: protege la pantalla de consentimiento OAuth del clickjacking.
+		header X-Frame-Options DENY
+		header Content-Security-Policy "frame-ancestors 'none'"
 		root * /srv
 		try_files {path} /index.html
 		file_server

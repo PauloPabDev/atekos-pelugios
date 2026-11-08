@@ -1,6 +1,6 @@
 import type { Scope } from '@atekos/shared'
 import { expect, it } from 'vitest'
-import { canRead, canWrite, type Actor } from '../src/modules/devices/domain/policy'
+import { canCreate, canRead, canWrite, type Actor } from '../src/modules/devices/domain/policy'
 
 const owner = 'u-owner'
 const pub = { id: 'd1', ownerId: owner, visibility: 'public' } as const
@@ -30,4 +30,18 @@ it.each<[string, Actor, boolean, boolean, boolean, boolean]>([
 	expect(canRead(actor, priv)).toBe(readPriv)
 	expect(canWrite(actor, pub, 'devices:write')).toBe(writePub)
 	expect(canWrite(actor, priv, 'devices:write')).toBe(writePriv)
+})
+
+// [actor, crear dispositivo, crear pantalla]: la REST exige sesión en la ruta; esto es lo que deja el caso de uso (MCP).
+it.each<[string, Actor, boolean, boolean]>([
+	['anónimo', { kind: 'anonymous' }, false, false],
+	['sesión', { kind: 'user', userId: owner }, true, true],
+	['token sin ligar con devices:write y displays:write', token(['devices:write', 'displays:write']), true, true],
+	['token solo de lectura', token(['devices:read']), false, false],
+	['token ligado a un dispositivo', token(rw, 'd1'), false, false],
+	['token ligado a una pantalla', { ...token(['displays:write']), displayId: 'p1' } as Actor, false, false],
+	['token del dispositivo MetaDisplay', token(['display:connect']), false, false],
+])('crear: %s', (_name, actor, device, display) => {
+	expect(canCreate(actor, 'devices:write')).toBe(device)
+	expect(canCreate(actor, 'displays:write')).toBe(display)
 })

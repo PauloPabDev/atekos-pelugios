@@ -10,6 +10,7 @@ import {
 	uniqueIndex,
 	primaryKey,
 } from 'drizzle-orm/pg-core'
+import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js'
 import type { DisplayTemplate, DisplayValues } from '@atekos/shared'
 
 export const visibility = pgEnum('visibility', ['public', 'private'])
@@ -88,6 +89,34 @@ export const apiTokens = pgTable('api_tokens', {
 	scopes: text('scopes').array().notNull(),
 	expiresAt: timestamp('expires_at', { withTimezone: true }),
 	lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+	revokedAt: timestamp('revoked_at', { withTimezone: true }),
+	createdAt: createdAt(),
+})
+
+// OAuth del servidor MCP (docs/MCP.md). Los clientes se registran solos (DCR, RFC 7591).
+export const oauthClients = pgTable('oauth_clients', {
+	id: text('id').primaryKey(), // client_id (uuid que genera el SDK)
+	// Metadatos tal cual los devuelve el registro. client_secret va en claro porque el SDK lo compara así;
+	// sin el código de un consentimiento y su verificador PKCE no sirve para sacar tokens.
+	info: jsonb('info').$type<OAuthClientInformationFull>().notNull(),
+	createdAt: createdAt(),
+})
+
+// Un grant = una app conectada: el access y el refresh vigentes de un usuario en un cliente.
+export const oauthGrants = pgTable('oauth_grants', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: uuid('user_id')
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	clientId: text('client_id')
+		.notNull()
+		.references(() => oauthClients.id, { onDelete: 'cascade' }),
+	scopes: text('scopes').array().notNull(),
+	accessHash: text('access_hash').notNull().unique(), // HMAC, como api_tokens
+	accessExpiresAt: timestamp('access_expires_at', { withTimezone: true }).notNull(),
+	refreshHash: text('refresh_hash').notNull().unique(),
+	refreshExpiresAt: timestamp('refresh_expires_at', { withTimezone: true }).notNull(),
+	lastUsedAt: timestamp('last_used_at', { withTimezone: true }), // se actualiza al refrescar
 	revokedAt: timestamp('revoked_at', { withTimezone: true }),
 	createdAt: createdAt(),
 })

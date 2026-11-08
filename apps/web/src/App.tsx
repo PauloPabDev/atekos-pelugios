@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router'
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import * as api from './api'
 import { Login, Register } from './pages/Auth'
+import { Authorize } from './pages/Authorize'
 import { Devices } from './pages/Devices'
 import { DeviceDetail } from './pages/DeviceDetail'
 import { Displays } from './pages/Displays'
@@ -21,16 +22,18 @@ export function App() {
 				<Route path="/displays" element={<Displays />} />
 				<Route path="/displays/:deviceId" element={<DisplayDetail />} />
 				<Route path="/tokens" element={<Tokens />} />
+				<Route path="/autorizar" element={<Authorize />} />
 			</Route>
 			<Route path="*" element={<main className="page">Página no encontrada.</main>} />
 		</Routes>
 	)
 }
 
-// Rutas protegidas: sin sesión (/auth/me → 401) redirige a /login
+// Rutas protegidas: sin sesión (/auth/me → 401) redirige a /login?next=<ruta> para volver tras entrar
 function Session() {
 	const qc = useQueryClient()
 	const navigate = useNavigate()
+	const { pathname, search } = useLocation()
 	const me = useQuery({ queryKey: ['me'], queryFn: api.me, retry: false })
 	const logout = useMutation({
 		mutationFn: api.logout,
@@ -41,7 +44,8 @@ function Session() {
 	})
 
 	if (me.isPending) return <main className="page">Cargando…</main>
-	if (me.error instanceof api.HttpError && me.error.status === 401) return <Navigate to="/login" replace />
+	if (me.error instanceof api.HttpError && me.error.status === 401)
+		return <Navigate to={`/login?next=${encodeURIComponent(pathname + search)}`} replace />
 	if (me.error)
 		return (
 			<main className="page">

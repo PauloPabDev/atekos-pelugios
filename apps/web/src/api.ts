@@ -14,6 +14,9 @@ import type {
 	DisplayTemplate,
 	DisplayValues,
 	LoginInput,
+	OAuthDecision,
+	OAuthGrant,
+	OAuthRequestInfo,
 	PatchDataInput,
 	PatchDeviceInput,
 	PatchDisplayInput,
@@ -88,6 +91,14 @@ export const listEvents = (id: string) => request<DeviceEvent[]>('GET', `${dev(i
 export const listTokens = () => request<ApiToken[]>('GET', '/tokens')
 export const createToken = (input: CreateTokenInput) => request<CreatedApiToken>('POST', '/tokens', input)
 export const revokeToken = (id: string) => request<unknown>('DELETE', `/tokens/${encodeURIComponent(id)}`)
+
+const oauthReq = (id: string) => `/oauth/requests/${encodeURIComponent(id)}`
+
+export const getOAuthRequest = (id: string) => request<OAuthRequestInfo>('GET', oauthReq(id))
+export const decideOAuthRequest = (id: string, approve: boolean) =>
+	request<OAuthDecision>('POST', oauthReq(id), { approve })
+export const listOAuthGrants = () => request<OAuthGrant[]>('GET', '/oauth/grants')
+export const revokeOAuthGrant = (id: string) => request<unknown>('DELETE', `/oauth/grants/${encodeURIComponent(id)}`)
 
 const disp = (deviceId: string) => `/displays/${encodeURIComponent(deviceId)}`
 

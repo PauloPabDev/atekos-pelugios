@@ -67,7 +67,7 @@ Acceso **admin** = sesión del dueño, o token del dueño con `displays:write` (
 | Método | Ruta | Acceso | Cuerpo → Respuesta |
 |---|---|---|---|
 | `GET` | `/displays` | admin | `Display[]` del usuario. Un token ligado solo ve la suya. |
-| `POST` | `/displays` | sesión | `{ deviceId, name }` → 201 `Display`. Si el `deviceId` ya existe → 409. |
+| `POST` | `/displays` | sesión | `{ deviceId, name }` → 201 `Display`. Si el `deviceId` ya existe → 409. La IA también puede darla de alta con la herramienta MCP `create_display`, con un grant OAuth con `displays:write` ([`../MCP.md`](../MCP.md)). |
 | `GET` | `/displays/:deviceId` | admin | `DisplayDetail` (`Display` + `template` activa + `templates: [{id, version}]` + `values`). |
 | `PATCH` | `/displays/:deviceId` | admin | `{ name?, activeTemplateId? }` → `Display`. Si cambia la activa: publica `template.set` + snapshot. Si la plantilla no existe → 422. |
 | `DELETE` | `/displays/:deviceId` | sesión | 204. Los tokens ligados caen en cascada (y se borra su `tok:` en caché), y se publica `close`. |
