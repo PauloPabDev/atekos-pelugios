@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { ApiToken, Scope } from '@atekos/shared'
-import { apiTokens, devices } from '../../../db/schema'
+import { apiTokens, devices, displays } from '../../../db/schema'
 import type { TokenRepository } from '../domain/ports'
 
 // Columnas que ve el cliente: nunca el hash.
@@ -11,6 +11,7 @@ const publicCols = {
 	prefix: apiTokens.prefix,
 	scopes: apiTokens.scopes,
 	deviceId: apiTokens.deviceId,
+	displayId: apiTokens.displayId,
 	expiresAt: apiTokens.expiresAt,
 	lastUsedAt: apiTokens.lastUsedAt,
 	revokedAt: apiTokens.revokedAt,
@@ -34,6 +35,13 @@ export const makePgTokenRepository = (db: NodePgDatabase): TokenRepository => ({
 			.select({ id: devices.id })
 			.from(devices)
 			.where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId)))
+		return rows.length > 0
+	},
+	async displayBelongsTo(displayId, userId) {
+		const rows = await db
+			.select({ id: displays.id })
+			.from(displays)
+			.where(and(eq(displays.id, displayId), eq(displays.ownerId, userId)))
 		return rows.length > 0
 	},
 	async create(t) {
@@ -63,6 +71,7 @@ export const makePgTokenRepository = (db: NodePgDatabase): TokenRepository => ({
 				userId: apiTokens.userId,
 				scopes: apiTokens.scopes,
 				deviceId: apiTokens.deviceId,
+				displayId: apiTokens.displayId,
 				expiresAt: apiTokens.expiresAt,
 			})
 			.from(apiTokens)

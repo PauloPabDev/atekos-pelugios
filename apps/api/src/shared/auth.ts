@@ -8,7 +8,14 @@ export async function resolveActor(c: Container, authorization?: string, cookieH
 	if (authorization?.startsWith('Bearer ')) {
 		const t = await c.tokens.verify.execute(authorization.slice(7))
 		if (!t) throw Unauthorized('token inválido, vencido o revocado')
-		return { kind: 'token', userId: t.userId, tokenId: t.id, scopes: t.scopes, deviceId: t.deviceId }
+		return {
+			kind: 'token',
+			userId: t.userId,
+			tokenId: t.id,
+			scopes: t.scopes,
+			deviceId: t.deviceId,
+			displayId: t.displayId ?? null, // ?? null: entradas de tok: cacheadas antes de esta versión
+		}
 	}
 	const sid = parseCookie(cookieHeader ?? '').sid
 	const userId = sid ? await c.auth.sessions.get(sid) : null

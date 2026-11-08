@@ -12,6 +12,7 @@ test('tras crear, el token en claro aparece y no queda guardado en la lista', as
 		prefix: 'dmt_xxxx',
 		scopes: ['devices:read'],
 		deviceId: null,
+		displayId: null,
 		expiresAt: null,
 		lastUsedAt: null,
 		revokedAt: null,

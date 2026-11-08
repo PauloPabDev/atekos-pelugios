@@ -3,7 +3,15 @@ import type { Scope } from '@atekos/shared'
 export type Actor =
 	| { kind: 'anonymous' }
 	| { kind: 'user'; userId: string }
-	| { kind: 'token'; userId: string; tokenId: string; scopes: Scope[]; deviceId: string | null }
+	// displayId: token ligado a una pantalla MetaDisplay (ausente = no ligado)
+	| {
+			kind: 'token'
+			userId: string
+			tokenId: string
+			scopes: Scope[]
+			deviceId: string | null
+			displayId?: string | null
+	  }
 
 type Target = { id: string; ownerId: string; visibility: 'public' | 'private' }
 
