@@ -106,7 +106,7 @@ Errores dentro de `/displays`:
 
 **`template.ack` / `data.ack` / `trust.ack` / `ota.ack`**: se registran en el log, con `warn` si `ok:false`. No tienen más efectos.
 
-**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}` y `display.brightness { percent }`. Todos pasan por `display-out` y tienen que caber en 8192 bytes.
+**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}` y `display.brightness { percent }`. Todos tienen que caber en 8192 bytes. Los que van a todos los sockets de la pantalla (REST, comandos y navegación `screen.*`) pasan por `display-out`; las respuestas a un toque (`ui.result`, `event.ack` y el snapshot de `data.refresh`) van directas al socket que tocó.
 
 ## 5. Toques (`touch.tap`) y reglas declarativas
 

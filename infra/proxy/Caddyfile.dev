@@ -5,6 +5,10 @@
 	handle /ws {
 		reverse_proxy api:3000
 	}
+	# /ws es coincidencia exacta: el WSS de las pantallas MetaDisplay necesita su propia ruta.
+	handle /ws/device {
+		reverse_proxy api:3000
+	}
 	handle {
 		reverse_proxy web:5173
 	}
