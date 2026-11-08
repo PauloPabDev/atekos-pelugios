@@ -15,10 +15,11 @@ export const makeMongoTelemetryRepository = (db: Db): TelemetryRepository => {
 		async list(deviceId, from, to, limit) {
 			const docs = await telemetry
 				.find({ deviceId, ts: { $gte: from, $lte: to } }, { projection: { _id: 0 } })
-				.sort({ ts: 1 })
+				// Las `limit` más recientes del rango, devueltas en orden ascendente (para gráficas).
+				.sort({ ts: -1 })
 				.limit(limit)
 				.toArray()
-			return docs.map((d) => ({ ...d, ts: d.ts.toISOString() }))
+			return docs.reverse().map((d) => ({ ...d, ts: d.ts.toISOString() }))
 		},
 	}
 }

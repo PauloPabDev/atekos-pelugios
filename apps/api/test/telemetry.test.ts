@@ -106,7 +106,7 @@ describe('telemetry', () => {
 
 		expect(values(await get({}).expect(200))).toEqual([0, 1, 2, 3, 4, 99])
 		expect(values(await get({ from: at(1), to: at(3) }).expect(200))).toEqual([1, 2, 3])
-		expect(values(await get({ limit: 2 }).expect(200))).toEqual([0, 1])
+		expect(values(await get({ limit: 2 }).expect(200))).toEqual([4, 99]) // las más recientes, en orden ascendente
 		expect(values(await get({ to: at(2) }).expect(200))).toEqual([0, 1, 2]) // from = to − 24 h
 		expect(values(await get({ from: at(4), to: at(4) }).expect(200))).toEqual([4])
 
