@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { loadEnv } from './config/env'
 import { createContainer } from './container'
 import { buildApp } from './app'
+import { attachWebSocket } from './ws/server'
 
 const env = (() => {
 	try {
@@ -18,7 +19,7 @@ const env = (() => {
 const logger = pino()
 const c = await createContainer(env, logger)
 const server = http.createServer(buildApp(c))
-// Fase 7: attachWebSocket(server, c)
+const ws = await attachWebSocket(server, c)
 server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'api escuchando'))
 
 const shutdown = (signal: string) => {
@@ -27,6 +28,8 @@ const shutdown = (signal: string) => {
 		await c.close()
 		process.exit(0)
 	})
+	// Los sockets WS cuentan como conexiones abiertas: hasta cerrarlos, server.close no llama a su callback.
+	void ws.close()
 }
 process.once('SIGTERM', shutdown)
 process.once('SIGINT', shutdown)
