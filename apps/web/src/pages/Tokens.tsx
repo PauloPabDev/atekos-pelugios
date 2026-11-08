@@ -16,6 +16,11 @@ export function Tokens() {
 	// de GET /tokens, que nunca lo incluye, así que al salir de la página desaparece
 	const create = useMutation({ mutationFn: api.createToken, onSuccess: refresh })
 	const revoke = useMutation({ mutationFn: api.revokeToken, onSuccess: refresh })
+	const grants = useQuery({ queryKey: ['oauth-grants'], queryFn: api.listOAuthGrants })
+	const revokeGrant = useMutation({
+		mutationFn: api.revokeOAuthGrant,
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['oauth-grants'] }),
+	})
 	const [copyMsg, setCopyMsg] = useState('')
 	// Scopes controlados para que el atajo de pantalla pueda marcarlos
 	const [scopes, setScopes] = useState<Scope[]>([])
@@ -211,6 +216,48 @@ export function Tokens() {
 						</div>
 					</div>
 				)}
+			</section>
+
+			<section>
+				<h2>Apps conectadas (IA)</h2>
+				{grants.isPending && <p>Cargando…</p>}
+				{grants.error && (
+					<p role="alert" className="error">
+						{grants.error.message}
+					</p>
+				)}
+				{grants.data?.length === 0 && <p className="muted">Ninguna app conectada.</p>}
+				{revokeGrant.error && (
+					<p role="alert" className="error">
+						{revokeGrant.error.message}
+					</p>
+				)}
+				<ul className="cards" aria-label="Apps conectadas">
+					{grants.data?.map((g) => (
+						<li key={g.id} className="card">
+							<div className="row">
+								<strong className="grow">{g.clientName}</strong>
+							</div>
+							<dl className="meta">
+								<dt>Scopes</dt>
+								<dd>{g.scopes.join(', ')}</dd>
+								<dt>Creada</dt>
+								<dd>{date(g.createdAt)}</dd>
+								<dt>Último uso</dt>
+								<dd>{date(g.lastUsedAt)}</dd>
+							</dl>
+							<button
+								type="button"
+								className="danger"
+								aria-label={`Revocar ${g.clientName}`}
+								disabled={revokeGrant.isPending && revokeGrant.variables === g.id}
+								onClick={() => revokeGrant.mutate(g.id)}
+							>
+								Revocar
+							</button>
+						</li>
+					))}
+				</ul>
 			</section>
 		</>
 	)
