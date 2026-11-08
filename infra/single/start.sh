@@ -31,7 +31,7 @@ trap 'stop; exit 0' TERM INT
 # La API migra y conecta al arrancar: espera a que las tres bases acepten conexiones.
 ready() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 for _ in $(seq 120); do
-	"$PG/pg_isready" -q -h 127.0.0.1 && ready 27017 && ready 6379 && break
+	"$PG/pg_isready" -q -h 127.0.0.1 -U postgres && ready 27017 && ready 6379 && break
 	sleep 1
 done
 
