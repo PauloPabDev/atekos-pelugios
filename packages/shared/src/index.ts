@@ -178,6 +178,35 @@ export type ApiToken = z.infer<typeof ApiToken>
 export const CreatedApiToken = ApiToken.extend({ token: z.string() })
 export type CreatedApiToken = z.infer<typeof CreatedApiToken>
 
+// ---------- OAuth del servidor MCP (docs/MCP.md) ----------
+
+// Lo que puede conceder el consentimiento: nunca display:connect (token del dispositivo) ni telemetry:write.
+export const OAUTH_SCOPES = ['devices:read', 'devices:write', 'displays:write'] as const satisfies readonly Scope[]
+
+// GET /oauth/requests/:id: lo que la pantalla de consentimiento enseña antes de decidir
+export const OAuthRequestInfo = z.object({
+	clientName: z.string(),
+	redirectHost: z.string(),
+	scopes: z.array(Scope),
+})
+export type OAuthRequestInfo = z.infer<typeof OAuthRequestInfo>
+
+// POST /oauth/requests/:id
+export const OAuthDecisionInput = z.object({ approve: z.boolean() })
+export type OAuthDecisionInput = z.infer<typeof OAuthDecisionInput>
+export const OAuthDecision = z.object({ redirectTo: z.string() })
+export type OAuthDecision = z.infer<typeof OAuthDecision>
+
+// GET /oauth/grants: apps conectadas (sin tokens)
+export const OAuthGrant = z.object({
+	id: z.uuid(),
+	clientName: z.string(),
+	scopes: z.array(Scope),
+	createdAt: z.string(),
+	lastUsedAt: z.string().nullable(),
+})
+export type OAuthGrant = z.infer<typeof OAuthGrant>
+
 // ---------- Errores HTTP ----------
 
 export const ApiError = z.object({ error: z.string(), message: z.string().optional(), issues: z.unknown().optional() })
