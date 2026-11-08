@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { SCOPES, type Scope } from '@atekos/shared'
+import { CreateTokenInput, SCOPES, type Scope } from '@atekos/shared'
 import * as api from '../api'
+import { Problems } from '../components/Problems'
 
 const date = (s: string | null) => (s ? new Date(s).toLocaleString() : 'nunca')
 
@@ -9,12 +10,17 @@ export function Tokens() {
 	const qc = useQueryClient()
 	const tokens = useQuery({ queryKey: ['tokens'], queryFn: api.listTokens })
 	const devices = useQuery({ queryKey: ['devices'], queryFn: api.listDevices })
+	const displays = useQuery({ queryKey: ['displays'], queryFn: api.listDisplays })
 	const refresh = () => qc.invalidateQueries({ queryKey: ['tokens'] })
 	// El token en claro solo vive en create.data (estado de esta página); la lista se recarga
 	// de GET /tokens, que nunca lo incluye, así que al salir de la página desaparece
 	const create = useMutation({ mutationFn: api.createToken, onSuccess: refresh })
 	const revoke = useMutation({ mutationFn: api.revokeToken, onSuccess: refresh })
 	const [copyMsg, setCopyMsg] = useState('')
+	// Scopes controlados para que el atajo de pantalla pueda marcarlos
+	const [scopes, setScopes] = useState<Scope[]>([])
+	const [invalid, setInvalid] = useState<string[]>([])
+	const displaySelect = useRef<HTMLSelectElement>(null)
 	const fresh = create.data
 
 	const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -23,15 +29,27 @@ export function Tokens() {
 		const f = new FormData(form)
 		const days = String(f.get('expiresInDays') ?? '')
 		setCopyMsg('')
-		create.mutate(
-			{
-				name: String(f.get('name')),
-				scopes: f.getAll('scopes') as Scope[],
-				deviceId: String(f.get('deviceId') ?? '') || undefined,
-				expiresInDays: days ? Number(days) : undefined,
+		// La regla de separación de CreateTokenInput (DISENO §1) se aplica antes de enviar, con sus mensajes
+		const parsed = CreateTokenInput.safeParse({
+			name: String(f.get('name')),
+			scopes,
+			deviceId: String(f.get('deviceId') ?? '') || undefined,
+			displayId: String(f.get('displayId') ?? '') || undefined,
+			expiresInDays: days ? Number(days) : undefined,
+		})
+		setInvalid(parsed.success ? [] : api.issueLines(parsed.error.issues))
+		if (!parsed.success) return
+		create.mutate(parsed.data, {
+			onSuccess: () => {
+				form.reset()
+				setScopes([])
 			},
-			{ onSuccess: () => form.reset() },
-		)
+		})
+	}
+
+	const forDisplay = () => {
+		setScopes(['display:connect'])
+		displaySelect.current?.focus()
 	}
 
 	const copy = async (token: string) => {
@@ -46,6 +64,7 @@ export function Tokens() {
 
 	const deviceName = (id: string | null) =>
 		id === null ? 'todos' : (devices.data?.find((d) => d.id === id)?.name ?? id)
+	const displayName = (id: string) => displays.data?.find((d) => d.id === id)?.name ?? id
 
 	return (
 		<>
@@ -75,8 +94,17 @@ export function Tokens() {
 						<dl className="meta">
 							<dt>Scopes</dt>
 							<dd>{t.scopes.join(', ')}</dd>
-							<dt>Dispositivo</dt>
-							<dd>{deviceName(t.deviceId)}</dd>
+							{t.displayId ? (
+								<>
+									<dt>Pantalla</dt>
+									<dd>{displayName(t.displayId)}</dd>
+								</>
+							) : (
+								<>
+									<dt>Dispositivo</dt>
+									<dd>{deviceName(t.deviceId)}</dd>
+								</>
+							)}
 							<dt>Último uso</dt>
 							<dd>{date(t.lastUsedAt)}</dd>
 							<dt>Vence</dt>
@@ -102,6 +130,11 @@ export function Tokens() {
 			<section>
 				<h2>Nuevo token</h2>
 				<form className="stack" onSubmit={onSubmit}>
+					<div className="row">
+						<button type="button" onClick={forDisplay}>
+							Token para pantalla MetaDisplay
+						</button>
+					</div>
 					<label>
 						Nombre
 						<input name="name" required maxLength={80} />
@@ -110,10 +143,19 @@ export function Tokens() {
 						<legend>Scopes</legend>
 						{SCOPES.map((s) => (
 							<label key={s} className="check">
-								<input type="checkbox" name="scopes" value={s} /> {s}
+								<input
+									type="checkbox"
+									checked={scopes.includes(s)}
+									onChange={(e) => setScopes(e.target.checked ? [...scopes, s] : scopes.filter((x) => x !== s))}
+								/>{' '}
+								{s}
 							</label>
 						))}
 					</fieldset>
+					<small>
+						display:connect es el token que va en la pantalla; displays:write sirve para administrar pantallas. No
+						pueden ir juntos.
+					</small>
 					<label>
 						Dispositivo (opcional)
 						<select name="deviceId" defaultValue="">
@@ -126,9 +168,23 @@ export function Tokens() {
 						</select>
 					</label>
 					<label>
+						Pantalla{scopes.includes('display:connect') ? ' (obligatoria con display:connect)' : ' (opcional)'}
+						<select name="displayId" defaultValue="" ref={displaySelect}>
+							<option value="">Ninguna</option>
+							{displays.data
+								?.filter((d) => d.id)
+								.map((d) => (
+									<option key={d.id} value={d.id}>
+										{`${d.name} (${d.deviceId})`}
+									</option>
+								))}
+						</select>
+					</label>
+					<label>
 						Vence en días (opcional)
 						<input name="expiresInDays" type="number" min={1} max={3650} inputMode="numeric" />
 					</label>
+					<Problems lines={invalid} />
 					{create.error && (
 						<p role="alert" className="error">
 							{create.error.message}
@@ -143,6 +199,12 @@ export function Tokens() {
 							<strong>Cópialo ahora: es la única vez que se muestra.</strong> Si lo pierdes, revócalo y crea otro.
 						</p>
 						<code className="token">{fresh.token}</code>
+						{fresh.scopes.includes('display:connect') && (
+							<p>
+								Pégalo tal cual en el campo <strong>token</strong> del portal WiFiManager de la pantalla,{' '}
+								<strong>sin</strong> «Bearer». La URL del servidor es <code>wss://{location.host}/ws/device</code>.
+							</p>
+						)}
 						<div className="row">
 							<button type="button" onClick={() => copy(fresh.token)}>
 								Copiar
