@@ -319,6 +319,7 @@ export const PatchDisplayInput = z
 export type PatchDisplayInput = z.infer<typeof PatchDisplayInput>
 
 export const Display = z.object({
+	id: z.uuid(), // el que piden CreateTokenInput.displayId y ApiToken.displayId
 	deviceId: z.string(),
 	name: z.string(),
 	activeTemplateId: z.string(),
