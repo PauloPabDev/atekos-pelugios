@@ -35,7 +35,8 @@ for _ in $(seq 120); do
 	sleep 1
 done
 
-node dist/main.js &
+# PORT fijo: Coolify inyecta PORT con el puerto expuesto (8080, el de Caddy) y la API chocaría con él.
+PORT=3000 node dist/main.js &
 api=$!
 caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
 caddy=$!

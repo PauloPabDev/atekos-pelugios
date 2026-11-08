@@ -65,7 +65,6 @@ COPY --from=caddy:2.10-alpine /usr/bin/caddy /usr/local/bin/caddy
 RUN ! ldd /usr/local/bin/* /usr/lib/postgresql/17/bin/* /usr/lib/postgresql/17/lib/*.so 2>&1 | grep 'not found'
 
 ENV NODE_ENV=production \
-	PORT=3000 \
 	DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres \
 	MONGO_URL=mongodb://127.0.0.1:27017 \
 	REDIS_URL=redis://127.0.0.1:6379
