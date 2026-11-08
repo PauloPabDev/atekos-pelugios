@@ -8,9 +8,13 @@ mkdir -p /data/mongo /data/redis
 # Primer arranque: initdb crea /data/postgres con permisos 0700. Solo escucha en 127.0.0.1, por eso trust.
 [ -s /data/postgres/PG_VERSION ] || "$PG/initdb" -D /data/postgres -U postgres --auth=trust --encoding=UTF8 >/dev/null
 
-"$PG/postgres" -D /data/postgres -c listen_addresses=127.0.0.1 -c unix_socket_directories=/tmp &
+# jit=off: la imagen no lleva LLVM (y con consultas tan pequeñas el JIT no compensa).
+"$PG/postgres" -D /data/postgres -c listen_addresses=127.0.0.1 -c unix_socket_directories=/tmp -c jit=off &
 pg=$!
-mongod --dbpath /data/mongo --bind_ip 127.0.0.1 --quiet &
+# Sin límite de memoria en el contenedor, la caché de WiredTiger se calcula sobre la RAM de todo el host (≈50 %).
+# Sin FTDC: no escribe hasta 200 MB de diagnóstico en /data/mongo/diagnostic.data.
+mongod --dbpath /data/mongo --bind_ip 127.0.0.1 --quiet --wiredTigerCacheSizeGB 0.25 \
+	--setParameter diagnosticDataCollectionEnabled=false &
 mongo=$!
 redis-server --bind 127.0.0.1 --port 6379 --dir /data/redis --appendonly yes --save '' &
 redis=$!
