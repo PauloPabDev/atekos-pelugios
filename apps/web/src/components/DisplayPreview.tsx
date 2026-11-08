@@ -91,21 +91,25 @@ export function DisplayPreview({
 				))}
 				{showActions && (
 					<g className="actions">
-						{template.actions.map((a) => (
-							<rect
-								key={a.id}
-								x={a.x + 0.5}
-								y={a.y + 0.5}
-								width={a.w - 1}
-								height={a.h - 1}
-								fill="#FF00FF"
-								fillOpacity={0.15}
-								stroke="#FF00FF"
-								strokeDasharray="3 2"
-							>
-								<title>{`${a.id} (${a.mode})`}</title>
-							</rect>
-						))}
+						{template.actions.flatMap((a) =>
+							a.x === undefined || a.y === undefined || a.w === undefined || a.h === undefined ? (
+								[]
+							) : (
+								<rect
+									key={a.id}
+									x={a.x + 0.5}
+									y={a.y + 0.5}
+									width={a.w - 1}
+									height={a.h - 1}
+									fill="#FF00FF"
+									fillOpacity={0.15}
+									stroke="#FF00FF"
+									strokeDasharray="3 2"
+								>
+									<title>{`${a.id} (${a.mode})`}</title>
+								</rect>
+							),
+						)}
 					</g>
 				)}
 			</svg>

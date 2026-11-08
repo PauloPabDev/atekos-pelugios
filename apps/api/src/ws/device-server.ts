@@ -162,6 +162,9 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 					templateVersion: m.templateVersion,
 					status: result.status,
 					toast: result.toast ?? null,
+					source: m.source ?? null,
+					button: m.button ?? null,
+					press: m.press ?? null,
 				})
 				.catch((err) => log.error({ err, eventId: m.eventId }, 'no se pudo guardar el toque'))
 		}

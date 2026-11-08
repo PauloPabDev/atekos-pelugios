@@ -5,6 +5,7 @@ import {
 	Display,
 	DISPLAY_HEIGHT,
 	DISPLAY_MAX_FRAME,
+	DISPLAY_MAX_TEMPLATE_BYTES,
 	DISPLAY_WIDTH,
 	DisplayClientMessage,
 	DisplayCommand,
@@ -21,7 +22,7 @@ import {
 // Implementa el protocolo oficial (docs/metadisplay/CONTRATO.md, asyncapi.yaml, openapi.yaml) con las
 // diferencias de docs/metadisplay/DISENO.md. Cualquier cambio en el contenido exige subir version y updatedAt:
 // `pnpm contract` se niega a regenerar docs/metadisplay/generado/ si no.
-export const METADISPLAY_CONTRACT = { version: '1.0.0', updatedAt: '2026-11-08', protocol: 1 } as const
+export const METADISPLAY_CONTRACT = { version: '1.1.0', updatedAt: '2026-11-08', protocol: 1 } as const
 
 type Json = Record<string, unknown>
 type Target = 'draft-7' | 'draft-2020-12'
@@ -47,13 +48,16 @@ const SUMMARY: Record<string, string> = {
 	'template.ack': 'Confirma o rechaza (ok:false, reason) la plantilla recibida.',
 	'data.ack': 'Confirma un data.update. Con otra templateVersion: ok:false, reason "version_mismatch".',
 	'touch.tap':
-		'Toque sobre una acción remote o hybrid. El eventId es idempotente: el servidor deduplica y responde ui.result o event.ack.',
+		'Toque o pulsación de botón físico (source, button, press) sobre una acción remote o hybrid. El eventId es idempotente: el servidor deduplica y responde ui.result o event.ack.',
+	'frag.ack':
+		'Mensaje troceado reensamblado (ok:true) o descartado (ok:false, reason: too_large, incomplete…). El mensaje reensamblado se confirma además con su propio ack.',
 	'trust.ack': 'Reservado: el servidor aún no envía trust.* (pendiente de homologar el hardware).',
 	'ota.ack': 'Reservado: el servidor aún no envía ota.install (pendiente de homologar el hardware).',
 	'template.set': 'Plantilla completa. Solo se envía si la del hello no coincide en id y version.',
 	'data.update': 'snapshot sustituye todos los valores; patch actualiza solo las claves enviadas.',
 	'ui.result': 'Resultado de un touch.tap: estado, toast opcional y patch de valores.',
 	'event.ack': 'Confirma un touch.tap cuyo resultado llegará más tarde.',
+	frag: 'Trozo de un mensaje de más de 8192 bytes. Los trozos de un mensaje llegan seguidos (seq 0..count-1); concatenando sus data decodificados (bytes en total) sale el JSON del mensaje original, que se procesa como si hubiera llegado entero.',
 	'display.refresh': 'Fuerza un redibujado completo.',
 	'display.brightness': 'Brillo en porcentaje, de 0 a 50.',
 }
@@ -61,7 +65,7 @@ const SUMMARY: Record<string, string> = {
 const typeOf = (o: z.ZodObject) => (o.shape.type as z.ZodLiteral<string>).value
 
 // AsyncAPI 3.0 del WSS /ws/device, desde el punto de vista del servidor atekos.
-export function metaDisplayAsyncApi(origin: string): Json {
+export function metaDisplayAsyncApi(origin: string, maxBytes: number = DISPLAY_MAX_TEMPLATE_BYTES): Json {
 	const [scheme, host] = origin.split('://') // shared no tiene URL (sin lib DOM ni tipos de Node)
 	const msgs = (union: { options: readonly z.ZodObject[] }, from: 'device' | 'server') =>
 		union.options.map((o) => {
@@ -77,10 +81,11 @@ export function metaDisplayAsyncApi(origin: string): Json {
 		info: {
 			title: 'MetaDisplay en atekos-pelugios',
 			version: METADISPLAY_CONTRACT.version,
-			description: `Protocolo MetaDisplay ${METADISPLAY_CONTRACT.protocol} sobre WSS: JSON UTF-8 en tramas de texto de hasta ${DISPLAY_MAX_FRAME} bytes, lienzo de ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT}. El token va solo en la cabecera Authorization del upgrade (nunca en la query).`,
+			description: `Protocolo MetaDisplay ${METADISPLAY_CONTRACT.protocol} sobre WSS: JSON UTF-8 en tramas de texto de hasta ${DISPLAY_MAX_FRAME} bytes; un mensaje mayor (hasta ${maxBytes} bytes) llega troceado en frag. Lienzo de ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} en vertical o ${DISPLAY_HEIGHT}×${DISPLAY_WIDTH} con template.rotation 90/270. El token va solo en la cabecera Authorization del upgrade (nunca en la query). Guía de plantillas: docs/metadisplay/PLANTILLAS.md.`,
 			'x-updated': METADISPLAY_CONTRACT.updatedAt,
 			'x-protocol': METADISPLAY_CONTRACT.protocol,
 			'x-max-frame-bytes': DISPLAY_MAX_FRAME,
+			'x-max-message-bytes': maxBytes,
 		},
 		defaultContentType: 'application/json',
 		servers: {
@@ -116,7 +121,7 @@ export function metaDisplayAsyncApi(origin: string): Json {
 }
 
 // OpenAPI 3.1 de la REST de pantallas (/api/v1/displays) y del propio contrato.
-export function metaDisplayOpenApi(origin: string): Json {
+export function metaDisplayOpenApi(origin: string, maxBytes: number = DISPLAY_MAX_TEMPLATE_BYTES): Json {
 	const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` })
 	const body = (s: Json) => ({ required: true, content: { 'application/json': { schema: s } } })
 	const res = (description: string, s?: Json) =>
@@ -131,7 +136,7 @@ export function metaDisplayOpenApi(origin: string): Json {
 		'404': err('Pantalla ajena, inexistente o deviceId mal formado'),
 	}
 	const values = { type: 'object', properties: { values: ref('DisplayValues') }, required: ['values'] }
-	const tooLarge = err(`El mensaje resultante pasa de ${DISPLAY_MAX_FRAME} bytes (message_too_large)`)
+	const tooLarge = err(`El cuerpo o el mensaje resultante pasa de ${maxBytes} bytes (message_too_large)`)
 
 	return {
 		openapi: '3.1.0',
@@ -141,6 +146,7 @@ export function metaDisplayOpenApi(origin: string): Json {
 			description:
 				'Administración de pantallas, plantillas y datos. El dispositivo no la usa: habla solo por WSS /ws/device (ver asyncapi.json). Errores: { error, message?, issues? }.',
 			'x-updated': METADISPLAY_CONTRACT.updatedAt,
+			'x-max-message-bytes': maxBytes,
 		},
 		servers: [{ url: `${origin}/api/v1` }],
 		security: admin,
@@ -242,7 +248,7 @@ export function metaDisplayOpenApi(origin: string): Json {
 						'200': res('Valores', values),
 						...common,
 						'413': tooLarge,
-						'422': err('Valores inválidos (invalid_data)'),
+						'422': err('Valores inválidos o que no cumplen los params de la plantilla activa (invalid_data)'),
 					},
 				},
 				patch: {
@@ -252,7 +258,7 @@ export function metaDisplayOpenApi(origin: string): Json {
 						'200': res('Valores', values),
 						...common,
 						'413': tooLarge,
-						'422': err('Valores inválidos o más de 64 claves'),
+						'422': err('Valores inválidos, más de 64 claves o que no cumplen los params de la plantilla activa'),
 					},
 				},
 			},

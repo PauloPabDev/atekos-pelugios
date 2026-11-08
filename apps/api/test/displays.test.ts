@@ -444,6 +444,9 @@ describe('displays', () => {
 				templateVersion: 1,
 				status: 'ok',
 				toast: 'Datos actualizados',
+				source: 'button',
+				button: 0,
+				press: 'short',
 			})
 		await touch('e1', 1)
 		await touch('e2', 2)
@@ -471,6 +474,9 @@ describe('displays', () => {
 			templateVersion: 1,
 			status: 'ok',
 			toast: 'Datos actualizados',
+			source: 'button',
+			button: 0,
+			press: 'short',
 		})
 		expect(body[0].ts).toBe(new Date(body[0].ts).toISOString())
 		await agent
