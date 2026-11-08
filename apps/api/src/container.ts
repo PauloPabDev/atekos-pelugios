@@ -56,6 +56,10 @@ import { makeRedisDisplayPresence } from './modules/displays/infrastructure/redi
 import { IngestTelemetry } from './modules/telemetry/application/ingest-telemetry'
 import { QueryTelemetry } from './modules/telemetry/application/query-telemetry'
 import { makeMongoTelemetryRepository } from './modules/telemetry/infrastructure/mongo-telemetry-repository'
+import { OAuthConsent } from './modules/oauth/application/consent'
+import { makeOAuthProvider } from './modules/oauth/application/provider'
+import { makePgOAuthRepository } from './modules/oauth/infrastructure/pg-oauth-repository'
+import { makeRedisOAuthStore } from './modules/oauth/infrastructure/redis-oauth-store'
 
 // Relativa a este archivo, no al cwd: vale igual desde src/container.ts que desde dist/main.js.
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url))
@@ -99,6 +103,8 @@ export async function createContainer(env: Env, logger: Logger) {
 		outbox: makeRedisDisplayOutbox(redis, sub),
 		eventLog: makeMongoDisplayEventLog(mongo),
 	}
+
+	const od = { repo: makePgOAuthRepository(db), store: makeRedisOAuthStore(redis), hasher }
 
 	return {
 		env,
@@ -153,6 +159,14 @@ export async function createContainer(env: Env, logger: Logger) {
 			listEvents: new ListDisplayEvents(dd),
 			sendCommand: new SendCommand(dd),
 		},
+		// OAuth y MCP (docs/MCP.md): sin PUBLIC_URL no hay issuer, así que no se montan.
+		oauth: env.PUBLIC_URL
+			? {
+					publicUrl: env.PUBLIC_URL,
+					provider: makeOAuthProvider({ ...od, publicUrl: env.PUBLIC_URL }),
+					consent: new OAuthConsent(od),
+				}
+			: null,
 		telemetry: {
 			ingest: new IngestTelemetry({ get: getDevice, repo: telemetryRepo }),
 			query: new QueryTelemetry({ get: getDevice, repo: telemetryRepo }),

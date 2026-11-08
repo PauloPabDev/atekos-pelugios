@@ -12,6 +12,7 @@ import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
 import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
 import { telemetryRoutes } from './modules/telemetry/infrastructure/http-routes'
 import { displayRoutes } from './modules/displays/infrastructure/http-routes'
+import { oauthConsentRoutes, oauthServerRoutes } from './modules/oauth/infrastructure/http-routes'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -29,6 +30,8 @@ export function buildApp(c: Container) {
 			redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
 		}),
 	)
+	if (c.oauth) app.use(oauthServerRoutes(c.oauth))
+	else c.logger.warn('OAuth y MCP desactivados: falta PUBLIC_URL (docs/MCP.md)')
 	// CSRF (§9): las escrituras con cuerpo solo se aceptan en JSON. `Content-Length: 0` no cuenta como cuerpo.
 	app.use((req, _res, next) => {
 		const hasBody = req.headers['transfer-encoding'] !== undefined || Number(req.headers['content-length']) > 0
@@ -65,6 +68,7 @@ export function buildApp(c: Container) {
 	api.use(deviceRoutes(c))
 	api.use(telemetryRoutes(c))
 	api.use('/displays', displayRoutes(c))
+	if (c.oauth) api.use('/oauth', oauthConsentRoutes(c.oauth.consent))
 
 	app.use('/api/v1', api)
 	app.use('/api', () => {

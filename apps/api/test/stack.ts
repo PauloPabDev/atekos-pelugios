@@ -16,19 +16,22 @@ export async function startStack() {
 		new MongoDBContainer('mongo:8.0').start(),
 		new RedisContainer('redis:8.2-alpine').start(),
 	])
+	// Primero el puerto: PUBLIC_URL (issuer OAuth) lo necesita antes de crear la app.
+	const server = http.createServer()
+	await new Promise<void>((r) => server.listen(0, r))
+	const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 	const env = loadEnv({
 		NODE_ENV: 'test',
 		DATABASE_URL: pg.getConnectionUri(),
 		MONGO_URL: `${mongo.getConnectionString()}?directConnection=true`,
 		REDIS_URL: redis.getConnectionUrl(),
 		TOKEN_PEPPER: 'test-pepper-'.padEnd(40, 'x'),
+		PUBLIC_URL: url,
 	})
 	const c = await createContainer(env, pino({ level: 'silent' }))
-	const server = http.createServer(buildApp(c))
+	server.on('request', buildApp(c))
 	const ws = await attachWebSocket(server, c)
 	const deviceWs = await attachDeviceWebSocket(server, c)
-	await new Promise<void>((r) => server.listen(0, r))
-	const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 	return {
 		c,
 		url,

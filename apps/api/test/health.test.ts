@@ -16,7 +16,15 @@ it('al arrancar migra PG y crea las colecciones time-series de Mongo', async () 
 	const { rows } = await s.c.pool.query<{ tablename: string }>(
 		"select tablename from pg_tables where schemaname = 'public' order by tablename",
 	)
-	expect(rows.map((r) => r.tablename)).toEqual(['api_tokens', 'devices', 'display_templates', 'displays', 'users'])
+	expect(rows.map((r) => r.tablename)).toEqual([
+		'api_tokens',
+		'devices',
+		'display_templates',
+		'displays',
+		'oauth_clients',
+		'oauth_grants',
+		'users',
+	])
 	const cols = await s.c.mongo.listCollections({ type: 'timeseries' }, { nameOnly: true }).toArray()
 	expect(cols.map((col) => col.name).sort()).toEqual(['device_events', 'display_events', 'telemetry'])
 })
