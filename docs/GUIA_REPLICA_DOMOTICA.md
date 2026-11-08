@@ -276,6 +276,7 @@ Base `/api/v1`. Los cuerpos son JSON validados con los esquemas de `packages/sha
 | `POST` | `/devices/:id/telemetry` | dueño · `telemetry:write` | `{ values: {...}, ts? }`, con rate limit por token. |
 | `GET` | `/devices/:id/telemetry?from&to&limit` | lector | Lecturas en un rango. |
 | `GET` | `/health` | público | Hace ping a PG, Mongo y Redis; responde 200 o 503. Lo usa el healthcheck de Docker. |
+| `GET` | `/contract/{asyncapi,openapi}.json` | público | Contrato MetaDisplay generado desde los esquemas zod, con el origen de `PUBLIC_URL` ([`metadisplay/README.md`](metadisplay/README.md)). |
 
 ### Equivalencias con el sistema actual
 
