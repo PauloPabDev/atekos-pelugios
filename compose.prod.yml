@@ -1,0 +1,21 @@
+services:
+  postgres:
+    restart: unless-stopped
+  mongo:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+  api:
+    build:
+      target: prod
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+  proxy:
+    build:
+      target: prod
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
