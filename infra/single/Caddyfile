@@ -1,0 +1,28 @@
+# Caddy de la imagen única: solo HTTP en :8080, porque el HTTPS lo pone el proxy de Coolify por delante.
+{
+	admin off
+	auto_https off
+	# El proxy de Coolify llega desde la red privada de Docker: se confía en su X-Forwarded-For.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:8080 {
+	encode zstd gzip
+	header -Server
+
+	@api path /api/* /ws /ws/device
+	handle @api {
+		reverse_proxy 127.0.0.1:3000 {
+			# La API tiene trust proxy = 1: le llega solo la IP real del cliente, no la del proxy de Coolify.
+			# Sin esto, todos los usuarios compartirían el rate limit (login: 5/min).
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
