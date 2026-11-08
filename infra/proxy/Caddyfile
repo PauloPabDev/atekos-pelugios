@@ -1,0 +1,26 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header -Server
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /ws {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Opcional: HTTP sin TLS solo para dispositivos de la LAN (ESP8266). El token sigue siendo obligatorio.
+# Publica "8081:8081" en compose.prod.yml para usarlo.
+http://:8081 {
+	@lan remote_ip private_ranges
+	handle @lan {
+		reverse_proxy api:3000
+	}
+	respond 403
+}
