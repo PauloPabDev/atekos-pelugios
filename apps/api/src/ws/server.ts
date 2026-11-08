@@ -44,6 +44,8 @@ export async function attachWebSocket(server: Server, c: Container) {
 	function onConnection(ws: WebSocket, actor: Actor) {
 		const mine = new Set<string>()
 		let alive = true
+		// Sin listener, un 'error' del socket (p. ej. trama > maxPayload, que ws ya cierra con 1009) tumba el proceso.
+		ws.on('error', (err) => c.logger.warn({ err }, 'error en /ws'))
 		ws.on('pong', () => (alive = true))
 		const heartbeat = setInterval(() => {
 			if (!alive) return ws.terminate() // ESP sin WiFi: se limpia solo
