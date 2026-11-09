@@ -18,11 +18,17 @@ import { DisplayPreview } from '../components/DisplayPreview'
 import { Icon } from '../components/Icon'
 import { Problems } from '../components/Problems'
 import { Status } from '../components/Status'
+import { IconTile, Loading, PageHeader } from '../components/ui'
 import { goalData, goalTemplate, showcaseTemplate, statusTemplate } from '../examples'
 import { Online } from './Displays'
-import '../styles/displays.css'
 
 const fmt = (v: unknown) => JSON.stringify(v, null, 2)
+// Las anclas de la subnav no quedan bajo la cabecera fija de 56px del móvil
+const SECTION = 'scroll-mt-20 lg:scroll-mt-8'
+// Tarjeta con cabecera y pie (Parámetros, Datos)
+const CARD_HEAD = 'border-b border-line px-4 py-3 sm:px-5'
+const CARD_FOOT =
+	'flex flex-wrap items-center justify-end gap-2 rounded-b-lg border-t border-line bg-canvas px-4 py-3 sm:px-5'
 
 // Errores de /displays (DISENO §3) que el usuario puede entender y corregir desde aquí
 const EXPLAIN: Record<string, string> = {
@@ -58,7 +64,7 @@ export function DisplayDetail() {
 
 	// Con datos ya cargados, un fallo del polling no desmonta el panel (perdería los borradores)
 	if (display.data) return <Panel key={deviceId} id={deviceId} d={display.data} pollError={display.error} />
-	if (display.isPending) return <p className="loading">Cargando…</p>
+	if (display.isPending) return <Loading />
 	return (
 		<>
 			<BackLink />
@@ -75,8 +81,11 @@ export function DisplayDetail() {
 
 function BackLink() {
 	return (
-		<Link to="/displays" className="back">
-			<Icon name="back" />
+		<Link
+			to="/displays"
+			className="-ml-1 mb-2 inline-flex h-11 items-center gap-1 rounded-md px-1 text-sm font-medium text-fg-muted hover:text-fg sm:h-8"
+		>
+			<Icon name="back" size={16} />
 			Mis pantallas
 		</Link>
 	)
@@ -122,19 +131,20 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 
 	return (
 		<>
-			<BackLink />
-			<div className="display-head">
-				<h1>{d.name}</h1>
-				<div className="chips">
-					<Online online={d.online} />
-					<span className="chip mono">{d.deviceId}</span>
-					<span className="chip">
-						plantilla activa {d.template.id} v{d.template.version}
-					</span>
-				</div>
-			</div>
-			<Problems lines={api.errorLines(pollError)} />
-			<nav aria-label="Secciones" className="sections">
+			<PageHeader
+				back={<BackLink />}
+				title={<span className="wrap-anywhere">{d.name}</span>}
+				description={
+					<div className="mt-2 flex flex-wrap items-center gap-2">
+						<Online online={d.online} />
+						<span className="mono">{d.deviceId}</span>
+						<span className="wrap-anywhere">
+							plantilla activa {d.template.id} v{d.template.version}
+						</span>
+					</div>
+				}
+			/>
+			<nav aria-label="Secciones" className="subnav">
 				<a href="#plantilla">Plantilla</a>
 				{Object.keys(d.template.params ?? {}).length > 0 && <a href="#parametros">Parámetros</a>}
 				<a href="#datos">Datos</a>
@@ -143,110 +153,142 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 				<a href="#borrar">Borrar</a>
 			</nav>
 
-			<section id="plantilla">
-				<h2>Plantilla</h2>
-				<div className="editor display-editor">
-					<div className="preview-col">
-						<div className="preview-dock">
-							<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
-						</div>
-						{!draft.data && <p className="muted">El borrador tiene errores: se muestra la plantilla activa.</p>}
-						<div className="row">
-							<label className="check">
-								<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} />{' '}
-								Mostrar zonas táctiles
-							</label>
-							{shown.animation && (
-								<label className="check">
-									<input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} /> Reproducir
-									animación
-								</label>
-							)}
-						</div>
-					</div>
-					<div className="stack">
-						<div className="card stack">
-							<label>
-								Plantillas guardadas
-								<select ref={pick} key={d.activeTemplateId} defaultValue={d.activeTemplateId}>
-									{d.templates.map((t) => (
-										<option key={t.id} value={t.id}>
-											{`${t.id} v${t.version}${t.id === d.activeTemplateId ? ' (activa)' : ''}`}
-										</option>
-									))}
-								</select>
-							</label>
-							<div className="row">
-								<button
-									type="button"
-									onClick={() => activate.mutate(pick.current?.value ?? '')}
-									disabled={activate.isPending}
-								>
-									Activar
-								</button>
-								<button type="button" onClick={edit} disabled={!templates.data}>
-									Abrir en el editor
-								</button>
+			<div className="mt-6 space-y-10">
+				<Problems lines={api.errorLines(pollError)} />
+				<section id="plantilla" className={SECTION}>
+					<h2 className="mb-3">Plantilla</h2>
+					<div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+						{/* En el móvil la columna se disuelve: la vista previa queda fija durante todo el editor */}
+						<div className="max-lg:contents lg:sticky lg:top-8 lg:space-y-2">
+							<div className="sticky top-14 z-20 -mx-4 border-b border-line bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
+								{/* Ancho y alto auto: manda el tamaño ×2 del SVG, recortado por los máximos sin deformarse;
+								    en el móvil, más de 24svh deja el JSON en pocas líneas entre la cabecera, el pie y las pestañas */}
+								<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[24svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-14rem)]">
+									<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
+								</div>
+								{!draft.data && (
+									<p className="mt-1.5 text-center text-xs text-warning-fg">
+										El borrador tiene errores: se muestra la plantilla activa.
+									</p>
+								)}
 							</div>
-							<Problems lines={[...api.errorLines(activate.error, EXPLAIN), ...api.errorLines(templates.error)]} />
+							<div className="flex flex-wrap gap-x-5">
+								<label className="check">
+									<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} />
+									Mostrar zonas táctiles
+								</label>
+								{shown.animation && (
+									<label className="check">
+										<input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} />
+										Reproducir animación
+									</label>
+								)}
+							</div>
 						</div>
-						<div className="row">
-							<button type="button" className="ghost" onClick={() => setText(fmt(goalTemplate))}>
-								Cargar ejemplo
-							</button>
-							<button type="button" className="ghost" onClick={() => setText(fmt(statusTemplate))}>
-								Cargar ejemplo de estado
-							</button>
-							<button type="button" className="ghost" onClick={() => setText(fmt(showcaseTemplate))}>
-								Cargar ejemplo avanzado
-							</button>
+						<div className="mt-3 space-y-4 lg:mt-0">
+							<div className="space-y-2">
+								<div className="flex flex-wrap items-end gap-2">
+									<label className="field min-w-0 flex-1 basis-48">
+										Plantillas guardadas
+										<select ref={pick} key={d.activeTemplateId} defaultValue={d.activeTemplateId}>
+											{d.templates.map((t) => (
+												<option key={t.id} value={t.id}>
+													{`${t.id} v${t.version}${t.id === d.activeTemplateId ? ' (activa)' : ''}`}
+												</option>
+											))}
+										</select>
+									</label>
+									<div className="flex gap-2">
+										<button
+											type="button"
+											className="btn btn-secondary"
+											onClick={() => activate.mutate(pick.current?.value ?? '')}
+											disabled={activate.isPending}
+										>
+											Activar
+										</button>
+										<button type="button" className="btn btn-secondary" onClick={edit} disabled={!templates.data}>
+											Abrir en el editor
+										</button>
+									</div>
+								</div>
+								<Problems lines={[...api.errorLines(activate.error, EXPLAIN), ...api.errorLines(templates.error)]} />
+							</div>
+							<div className="divide-y divide-line rounded-lg border border-line bg-surface px-3">
+								<details>
+									<summary>Ejemplos</summary>
+									<div className="-mx-2 flex flex-wrap pb-2">
+										<button type="button" className="btn btn-ghost" onClick={() => setText(fmt(goalTemplate))}>
+											Cargar ejemplo
+										</button>
+										<button type="button" className="btn btn-ghost" onClick={() => setText(fmt(statusTemplate))}>
+											Cargar ejemplo de estado
+										</button>
+										<button type="button" className="btn btn-ghost" onClick={() => setText(fmt(showcaseTemplate))}>
+											Cargar ejemplo avanzado
+										</button>
+									</div>
+								</details>
+								<ImportImage text={text} setText={setText} />
+							</div>
+							<div className="flex flex-col gap-1.5">
+								<label className="field">
+									Plantilla (JSON)
+									<textarea
+										value={text}
+										onChange={(e) => setText(e.target.value)}
+										rows={18}
+										spellCheck={false}
+										aria-invalid={!draft.data}
+										aria-describedby="template-hint"
+									/>
+								</label>
+								<small id="template-hint">
+									La pantalla cachea por id y versión: para guardar cambios en un id que ya existe, sube la versión.
+								</small>
+							</div>
+							<Problems lines={draft.errors} />
+							{/* Con pestañas abajo, guardar queda siempre a mano justo encima de ellas (miden 3.5rem + 1px de borde);
+							    el error de guardado va dentro, junto a los botones */}
+							<div className="sticky bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-20 -mx-4 space-y-2 border-t border-line bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
+								<Problems lines={api.errorLines(save.error, EXPLAIN)} />
+								<div className="flex flex-wrap items-center gap-2">
+									<button type="button" className="btn btn-ghost" onClick={bump} disabled={!draft.data}>
+										version +1
+									</button>
+									<div className="mr-auto">
+										<Status m={save} text="Guardado." />
+									</div>
+									<div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+										<button
+											type="button"
+											className="btn btn-secondary"
+											onClick={() => saveDraft(false)}
+											disabled={!draft.data || save.isPending}
+										>
+											Guardar sin activar
+										</button>
+										<button
+											type="button"
+											className="btn btn-primary"
+											onClick={() => saveDraft(true)}
+											disabled={!draft.data || save.isPending}
+										>
+											Guardar y activar
+										</button>
+									</div>
+								</div>
+							</div>
 						</div>
-						<ImportImage text={text} setText={setText} />
-						<label>
-							Plantilla (JSON)
-							<textarea
-								value={text}
-								onChange={(e) => setText(e.target.value)}
-								rows={18}
-								spellCheck={false}
-								aria-invalid={!draft.data}
-								aria-describedby="template-hint"
-							/>
-						</label>
-						{/* «version +1» junto a la pista que lo explica: la barra de guardado queda con dos botones */}
-						<div className="row hint-row">
-							<small id="template-hint" className="grow">
-								La pantalla cachea por id y versión: para guardar cambios en un id que ya existe, sube la versión.
-							</small>
-							<button type="button" className="ghost" onClick={bump} disabled={!draft.data}>
-								version +1
-							</button>
-						</div>
-						<Problems lines={draft.errors} />
-						<div className="row save-bar">
-							<button
-								type="button"
-								className="primary"
-								onClick={() => saveDraft(true)}
-								disabled={!draft.data || save.isPending}
-							>
-								Guardar y activar
-							</button>
-							<button type="button" onClick={() => saveDraft(false)} disabled={!draft.data || save.isPending}>
-								Guardar sin activar
-							</button>
-							<Status m={save} text="Guardado." />
-						</div>
-						<Problems lines={api.errorLines(save.error, EXPLAIN)} />
 					</div>
-				</div>
-			</section>
+				</section>
 
-			<ParamsForm key={`${d.template.id}@${d.template.version}`} id={id} template={d.template} values={d.values} />
-			<DataEditor id={id} values={d.values} />
-			<Commands id={id} />
-			<Events id={id} />
-			<DeleteDisplay id={id} name={d.name} />
+				<ParamsForm key={`${d.template.id}@${d.template.version}`} id={id} template={d.template} values={d.values} />
+				<DataEditor id={id} values={d.values} />
+				<Commands id={id} />
+				<Events id={id} />
+				<DeleteDisplay id={id} name={d.name} />
+			</div>
 		</>
 	)
 }
@@ -304,11 +346,11 @@ function ImportImage({ text, setText }: { text: string; setText: (t: string) => 
 	}
 
 	return (
-		<details className="import-image">
+		<details>
 			<summary>Importar imagen</summary>
-			<div className="stack">
-				<div className="row">
-					<label>
+			<div className="space-y-3 pb-3">
+				<div className="grid grid-cols-2 gap-3 sm:grid-cols-[7rem_7rem_minmax(0,1fr)]">
+					<label className="field">
 						Ancho (px)
 						<input
 							type="number"
@@ -319,7 +361,7 @@ function ImportImage({ text, setText }: { text: string; setText: (t: string) => 
 							onChange={(e) => setSize({ ...size, w: e.target.value })}
 						/>
 					</label>
-					<label>
+					<label className="field">
 						Alto (px)
 						<input
 							type="number"
@@ -330,7 +372,7 @@ function ImportImage({ text, setText }: { text: string; setText: (t: string) => 
 							onChange={(e) => setSize({ ...size, h: e.target.value })}
 						/>
 					</label>
-					<label className="grow">
+					<label className="field col-span-2 sm:col-span-1">
 						Archivo
 						<input
 							ref={file}
@@ -344,7 +386,7 @@ function ImportImage({ text, setText }: { text: string; setText: (t: string) => 
 						/>
 					</label>
 				</div>
-				<small id="import-hint">
+				<small id="import-hint" className="block">
 					Se escala al tamaño elegido (vacío = el lienzo entero), se pasa a RGB565 con la compresión más corta y se
 					añade como elemento image en x 0, y 0. Muévelo editando el JSON.
 				</small>
@@ -375,58 +417,65 @@ function ParamsForm({ id, template, values }: { id: string; template: DisplayTem
 	const dirty = Object.keys(changed).length > 0
 
 	return (
-		<section id="parametros">
-			<h2>Parámetros</h2>
+		<section id="parametros" className={SECTION}>
 			<form
-				className="card stack"
+				className="card"
 				onSubmit={(e) => {
 					e.preventDefault()
 					if (dirty && !issues.length) send.mutate(changed)
 				}}
 			>
-				<p className="muted">
-					Los declara la plantilla activa ({template.id} v{template.version}) en <code>params</code>. Sin valor
-					guardado, se muestra su valor por defecto.
-				</p>
-				{params.map(([k, p]) => {
-					const name = p.description ? `${k}: ${p.description}` : k
-					if (p.type === 'boolean')
-						return (
-							<label key={k} className="check">
-								<input type="checkbox" checked={truthy(value(k))} onChange={(e) => set(k, e.target.checked)} /> {name}
-							</label>
-						)
-					return (
-						<label key={k}>
-							{name}
-							{p.type === 'number' ? (
-								<input
-									type="number"
-									step="any"
-									min={p.min}
-									max={p.max}
-									value={String(value(k) ?? '')}
-									onChange={(e) => set(k, e.target.value === '' ? null : Number(e.target.value))}
-								/>
-							) : (
-								<input
-									type="text"
-									maxLength={140}
-									value={String(value(k) ?? '')}
-									onChange={(e) => set(k, e.target.value)}
-								/>
-							)}
-						</label>
-					)
-				})}
-				<Problems lines={issues} />
-				<div className="row">
-					<button type="submit" className="primary" disabled={!dirty || issues.length > 0 || send.isPending}>
+				<div className={CARD_HEAD}>
+					<h2>Parámetros</h2>
+					<p className="mt-1 text-sm text-fg-muted">
+						Los declara la plantilla activa ({template.id} v{template.version}) en <code>params</code>. Sin valor
+						guardado, se muestra su valor por defecto.
+					</p>
+				</div>
+				<div className="space-y-4 p-4 sm:p-5">
+					<div className="grid gap-4 sm:grid-cols-2">
+						{params.map(([k, p]) => {
+							const name = p.description ? `${k}: ${p.description}` : k
+							if (p.type === 'boolean')
+								return (
+									<label key={k} className="check self-end">
+										<input type="checkbox" checked={truthy(value(k))} onChange={(e) => set(k, e.target.checked)} />
+										{name}
+									</label>
+								)
+							return (
+								<label key={k} className="field">
+									{name}
+									{p.type === 'number' ? (
+										<input
+											type="number"
+											step="any"
+											min={p.min}
+											max={p.max}
+											value={String(value(k) ?? '')}
+											onChange={(e) => set(k, e.target.value === '' ? null : Number(e.target.value))}
+										/>
+									) : (
+										<input
+											type="text"
+											maxLength={140}
+											value={String(value(k) ?? '')}
+											onChange={(e) => set(k, e.target.value)}
+										/>
+									)}
+								</label>
+							)
+						})}
+					</div>
+					<Problems lines={issues} />
+					<Problems lines={api.errorLines(send.error, EXPLAIN)} />
+				</div>
+				<div className={CARD_FOOT}>
+					<Status m={send} text="Enviado." />
+					<button type="submit" className="btn btn-primary" disabled={!dirty || issues.length > 0 || send.isPending}>
 						Enviar parámetros
 					</button>
-					<Status m={send} text="Enviado." />
 				</div>
-				<Problems lines={api.errorLines(send.error, EXPLAIN)} />
 			</form>
 		</section>
 	)
@@ -440,10 +489,10 @@ const origin = (ev: DisplayEvent) =>
 			: '—'
 
 // Resultado de ui.result en español; un estado nuevo de la API se ve tal cual
-const STATUS: Record<string, [label: string, chip: string]> = {
-	ok: ['Aceptado', 'green'],
-	rejected: ['Rechazado', 'yellow'],
-	error: ['Error', 'pink'],
+const STATUS: Record<string, [label: string, badge: string]> = {
+	ok: ['Aceptado', 'badge-success'],
+	rejected: ['Rechazado', 'badge-warning'],
+	error: ['Error', 'badge-danger'],
 }
 
 function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
@@ -463,37 +512,53 @@ function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 	}
 
 	return (
-		<section id="datos">
-			<h2>Datos</h2>
-			<div className="card stack">
-				<label>
-					Valores (JSON)
-					<textarea
-						value={text}
-						onChange={(e) => setText(e.target.value)}
-						rows={8}
-						spellCheck={false}
-						aria-invalid={!draft.data}
-						aria-describedby="data-hint"
-					/>
-				</label>
-				<small id="data-hint">
-					Reemplazar sustituye todos los valores; Combinar solo cambia las claves que envíes (null guarda null).
-				</small>
-				<Problems lines={draft.errors} />
-				<div className="row">
-					<button type="button" className="ghost" onClick={() => setText(fmt(goalData))}>
+		<section id="datos" className={SECTION}>
+			<div className="card">
+				<div className={`${CARD_HEAD} flex items-center justify-between gap-3`}>
+					<h2>Datos</h2>
+					<button type="button" className="btn btn-ghost -my-1.5 -mr-2" onClick={() => setText(fmt(goalData))}>
 						Cargar datos de ejemplo
 					</button>
-					<button type="button" onClick={() => send(false)} disabled={!draft.data || save.isPending}>
+				</div>
+				<div className="space-y-3 p-4 sm:p-5">
+					<div className="flex flex-col gap-1.5">
+						<label className="field">
+							Valores (JSON)
+							<textarea
+								value={text}
+								onChange={(e) => setText(e.target.value)}
+								rows={8}
+								spellCheck={false}
+								aria-invalid={!draft.data}
+								aria-describedby="data-hint"
+							/>
+						</label>
+						<small id="data-hint">
+							Reemplazar sustituye todos los valores; Combinar solo cambia las claves que envíes (null guarda null).
+						</small>
+					</div>
+					<Problems lines={draft.errors} />
+					<Problems lines={api.errorLines(save.error, EXPLAIN)} />
+				</div>
+				<div className={CARD_FOOT}>
+					<Status m={save} text="Guardado." />
+					<button
+						type="button"
+						className="btn btn-secondary"
+						onClick={() => send(false)}
+						disabled={!draft.data || save.isPending}
+					>
 						Reemplazar
 					</button>
-					<button type="button" onClick={() => send(true)} disabled={!draft.data || save.isPending}>
+					<button
+						type="button"
+						className="btn btn-secondary"
+						onClick={() => send(true)}
+						disabled={!draft.data || save.isPending}
+					>
 						Combinar
 					</button>
-					<Status m={save} text="Guardado." />
 				</div>
-				<Problems lines={api.errorLines(save.error, EXPLAIN)} />
 			</div>
 		</section>
 	)
@@ -504,24 +569,31 @@ function Commands({ id }: { id: string }) {
 	const send = useMutation({ mutationFn: (c: DisplayCommand) => api.sendDisplayCommand(id, c) })
 
 	return (
-		<section id="comandos">
+		<section id="comandos" className={SECTION}>
 			<h2>Comandos</h2>
-			<div className="cards">
-				<div className="card command">
-					<span className="tile">
-						<Icon name="refresh" />
-					</span>
-					<p className="muted">Fuerza un redibujado completo de la pantalla.</p>
-					<button type="button" onClick={() => send.mutate({ type: 'display.refresh' })} disabled={send.isPending}>
+			<div className="mt-3 grid gap-4 sm:grid-cols-2">
+				<div className="card flex flex-col p-4 sm:p-5">
+					<div className="flex items-center gap-3">
+						<IconTile name="refresh" />
+						<h3>Refrescar</h3>
+					</div>
+					<p className="mt-3 mb-4 text-sm text-fg-muted">Fuerza un redibujado completo de la pantalla.</p>
+					<button
+						type="button"
+						className="btn btn-secondary mt-auto self-start"
+						onClick={() => send.mutate({ type: 'display.refresh' })}
+						disabled={send.isPending}
+					>
 						Refrescar pantalla
 					</button>
 				</div>
-				<div className="card command">
-					<span className="tile yellow">
-						<Icon name="sun" />
-					</span>
-					<div className="row">
-						<label className="grow">
+				<div className="card flex flex-col p-4 sm:p-5">
+					<div className="flex items-center gap-3">
+						<IconTile name="sun" />
+						<h3>Brillo</h3>
+					</div>
+					<div className="mt-3 mb-4 flex items-end gap-3">
+						<label className="field flex-1">
 							Brillo (0 a 50)
 							<input
 								type="range"
@@ -531,10 +603,12 @@ function Commands({ id }: { id: string }) {
 								onChange={(e) => setPercent(Number(e.target.value))}
 							/>
 						</label>
-						<output>{percent}</output>
+						{/* Centrado con el slider, que mide 44px en el móvil y 36px desde sm */}
+						<output className="mono mb-2.5 w-9 text-center sm:mb-1.5">{percent}</output>
 					</div>
 					<button
 						type="button"
+						className="btn btn-secondary mt-auto self-start"
 						onClick={() => send.mutate({ type: 'display.brightness', percent })}
 						disabled={send.isPending}
 					>
@@ -542,8 +616,8 @@ function Commands({ id }: { id: string }) {
 					</button>
 				</div>
 			</div>
-			{/* Un solo envío para los dos comandos: el aviso y el error van debajo de ambos */}
-			<div className="command-result">
+			{/* Un solo envío para los dos comandos: el aviso y el error van debajo de ambos (sin ellos, alto 0) */}
+			<div className="mt-3 flex flex-col items-start gap-2">
 				<Status m={send} text="Enviado." />
 				<Problems lines={api.errorLines(send.error, EXPLAIN)} />
 			</div>
@@ -559,51 +633,56 @@ function Events({ id }: { id: string }) {
 	})
 
 	return (
-		<section id="eventos">
+		<section id="eventos" className={SECTION}>
 			<h2>Eventos</h2>
-			<Problems lines={api.errorLines(events.error)} />
-			{events.data?.length === 0 && (
-				<p className="muted">Todavía no hay eventos: aparecen al tocar la pantalla o pulsar sus botones.</p>
-			)}
-			{!!events.data?.length && (
-				<div className="table-wrap">
-					{/* La API ya los devuelve del más reciente al más antiguo */}
-					<table>
-						<thead>
-							<tr>
-								<th scope="col">Hora</th>
-								<th scope="col">Acción</th>
-								<th scope="col">Evento</th>
-								<th scope="col">Origen</th>
-								<th scope="col">Estado</th>
-								<th scope="col">Toast</th>
-								<th scope="col">x,y</th>
-							</tr>
-						</thead>
-						<tbody>
-							{events.data.map((ev, i) => (
-								<tr key={`${ev.eventId}-${i}`}>
-									<td>
-										<time dateTime={ev.ts}>{new Date(ev.ts).toLocaleString()}</time>
-									</td>
-									<td>{ev.actionId}</td>
-									<td>{ev.name ?? '—'}</td>
-									<td>{origin(ev)}</td>
-									<td>
-										<span className={`chip ${STATUS[ev.status]?.[1] ?? ''}`}>
-											{STATUS[ev.status]?.[0] ?? ev.status}
-										</span>
-									</td>
-									<td>{ev.toast ?? '—'}</td>
-									<td>
-										{ev.x},{ev.y}
-									</td>
+			<div className="mt-3 space-y-3">
+				{events.isPending && <Loading />}
+				<Problems lines={api.errorLines(events.error)} />
+				{events.data?.length === 0 && (
+					<p className="card px-4 py-6 text-center text-sm text-fg-muted">
+						Todavía no hay eventos: aparecen al tocar la pantalla o pulsar sus botones.
+					</p>
+				)}
+				{!!events.data?.length && (
+					<div className="card overflow-x-auto">
+						{/* La API ya los devuelve del más reciente al más antiguo */}
+						<table>
+							<thead>
+								<tr>
+									<th scope="col">Hora</th>
+									<th scope="col">Acción</th>
+									<th scope="col">Evento</th>
+									<th scope="col">Origen</th>
+									<th scope="col">Estado</th>
+									<th scope="col">Toast</th>
+									<th scope="col">x,y</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
+							</thead>
+							<tbody>
+								{events.data.map((ev, i) => (
+									<tr key={`${ev.eventId}-${i}`}>
+										<td className="whitespace-nowrap text-fg-muted">
+											<time dateTime={ev.ts}>{new Date(ev.ts).toLocaleString()}</time>
+										</td>
+										<td className="font-mono text-xs whitespace-nowrap">{ev.actionId}</td>
+										<td>{ev.name ?? '—'}</td>
+										<td className="whitespace-nowrap">{origin(ev)}</td>
+										<td>
+											<span className={`badge ${STATUS[ev.status]?.[1] ?? ''}`}>
+												{STATUS[ev.status]?.[0] ?? ev.status}
+											</span>
+										</td>
+										<td>{ev.toast ?? '—'}</td>
+										<td className="font-mono text-xs whitespace-nowrap">
+											{ev.x},{ev.y}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</div>
 		</section>
 	)
 }
@@ -621,33 +700,39 @@ function DeleteDisplay({ id, name }: { id: string; name: string }) {
 	})
 
 	return (
-		<section id="borrar">
-			<h2>Borrar</h2>
-			{confirming ? (
-				<div className="card confirm">
-					<p>
-						¿Borrar «{name}»? Sus tokens dejan de funcionar al momento y la pantalla se desconecta. No se puede
-						deshacer.
-					</p>
-					<div className="row">
-						<button type="button" className="danger-solid" onClick={() => del.mutate()} disabled={del.isPending}>
-							Sí, borrar
+		<section id="borrar" className={SECTION}>
+			<div className="card border-red-200 p-4 sm:p-5">
+				<h2>Borrar</h2>
+				{confirming ? (
+					<>
+						<p className="mt-1 text-sm text-fg-muted">
+							¿Borrar «{name}»? Sus tokens dejan de funcionar al momento y la pantalla se desconecta. No se puede
+							deshacer.
+						</p>
+						<div className="mt-4 flex flex-wrap gap-2">
+							<button type="button" className="btn btn-danger" onClick={() => del.mutate()} disabled={del.isPending}>
+								Sí, borrar
+							</button>
+							<button type="button" className="btn btn-secondary" autoFocus onClick={() => setConfirming(false)}>
+								Cancelar
+							</button>
+						</div>
+						<div className="mt-3">
+							<Problems lines={api.errorLines(del.error)} />
+						</div>
+					</>
+				) : (
+					<>
+						<p className="mt-1 text-sm text-fg-muted">
+							Quita la pantalla de tu cuenta con sus plantillas y datos. Sus tokens dejan de funcionar.
+						</p>
+						<button type="button" className="btn btn-danger-outline mt-4" onClick={() => setConfirming(true)}>
+							<Icon name="trash" size={16} />
+							Borrar pantalla
 						</button>
-						<button type="button" autoFocus onClick={() => setConfirming(false)}>
-							Cancelar
-						</button>
-					</div>
-					<Problems lines={api.errorLines(del.error)} />
-				</div>
-			) : (
-				<div className="card danger-zone">
-					<p>Quita la pantalla de tu cuenta con sus plantillas y datos. Sus tokens dejan de funcionar.</p>
-					<button type="button" className="danger" onClick={() => setConfirming(true)}>
-						<Icon name="trash" />
-						Borrar pantalla
-					</button>
-				</div>
-			)}
+					</>
+				)}
+			</div>
 		</section>
 	)
 }

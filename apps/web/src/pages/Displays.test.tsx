@@ -27,6 +27,7 @@ test('registrar una pantalla llama a POST /displays con el hex en mayúsculas y 
 	})
 	renderApp('/displays')
 
+	await userEvent.click(await screen.findByRole('button', { name: 'Nueva pantalla' }))
 	await userEvent.type(await screen.findByLabelText('Id de la pantalla'), 'md-34b7da01abcd')
 	await userEvent.type(screen.getByLabelText('Nombre'), 'Meta')
 	await userEvent.click(screen.getByRole('button', { name: 'Registrar pantalla' }))
@@ -48,6 +49,7 @@ test('un deviceId con formato inválido no se envía', async () => {
 	})
 	renderApp('/displays')
 
+	await userEvent.click(await screen.findByRole('button', { name: 'Nueva pantalla' }))
 	const input = await screen.findByLabelText('Id de la pantalla')
 	await userEvent.type(input, 'md-123')
 	await userEvent.type(screen.getByLabelText('Nombre'), 'Meta')
