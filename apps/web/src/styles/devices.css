@@ -1,0 +1,58 @@
+/* Dispositivos: tarjetas de la lista, héroe del detalle y vista pública */
+
+.device-card,
+.device-hero {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.device-card > .row + .row {
+	justify-content: space-between;
+}
+
+/* el gap ya separa: fuera los márgenes de p, .chips y .error */
+.device-card .error,
+.device-hero > *,
+.device-hero h1 {
+	margin: 0;
+}
+
+.device-hero {
+	margin-bottom: 1.5rem;
+}
+
+.public-device {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	margin-inline: auto;
+	text-align: center;
+}
+
+.public-device h1,
+.public-device p,
+.public-device .chips {
+	margin: 0;
+}
+
+.public-device .chips {
+	justify-content: center;
+}
+
+.public-device .tile {
+	width: 4rem;
+	height: 4rem;
+}
+
+.state.big {
+	min-height: 2.75rem;
+	padding: 0.25rem 1.125rem;
+	font-size: 1.125rem;
+}
+
+.state.big::before {
+	width: 0.8rem;
+	height: 0.8rem;
+}
