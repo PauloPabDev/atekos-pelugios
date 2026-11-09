@@ -54,6 +54,7 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 		},
 	})
 	const tabs = !!user && nav
+	const { pathname } = useLocation()
 
 	return (
 		<div className={tabs ? 'app has-nav' : 'app'}>
@@ -64,7 +65,15 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 				{tabs && (
 					<nav aria-label="Principal" className="tabs">
 						{TABS.map(([to, label, icon]) => (
-							<NavLink key={to} to={to} end={to === '/'}>
+							<NavLink
+								key={to}
+								to={to}
+								end={to === '/'}
+								// El detalle de un dispositivo cuelga de «/», que necesita end para no casar con todo
+								className={({ isActive }) =>
+									isActive || (to === '/' && pathname.startsWith('/devices/')) ? 'active' : undefined
+								}
+							>
 								<Icon name={icon} />
 								{label}
 							</NavLink>

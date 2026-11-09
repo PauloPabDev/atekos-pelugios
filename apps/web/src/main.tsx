@@ -2,9 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+// La base va antes que App: el CSS de cada página se carga después y puede afinarla
+import './styles.css'
 import { App } from './App'
 import { HttpError } from './api'
-import './styles.css'
 
 // Un 4xx no mejora reintentando (y un 404 de /p/:id debe verse al instante)
 const qc = new QueryClient({

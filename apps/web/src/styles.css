@@ -378,6 +378,19 @@ p {
 	margin-left: auto;
 }
 
+/* En el móvil la acción principal de la cabecera flota sobre las pestañas, al alcance del pulgar */
+@media (max-width: 63.99rem) {
+	.has-nav .page-head > .button.primary:last-child {
+		position: fixed;
+		right: 1rem;
+		bottom: calc(var(--tabbar-h) + 1rem + env(safe-area-inset-bottom));
+		z-index: 25;
+		min-height: 56px;
+		border-radius: var(--r-pill);
+		box-shadow: var(--sh);
+	}
+}
+
 .lead {
 	margin: -0.75rem 0 1.5rem;
 	color: var(--muted);
