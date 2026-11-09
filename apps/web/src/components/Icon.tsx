@@ -21,6 +21,10 @@ const PATHS = {
 	bot: 'M8 8h8a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3zM12 4v4M9.5 14h.01M14.5 14h.01',
 	shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z',
 	link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+	search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
+	chevron: 'M9 6l6 6-6 6',
+	logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
+	x: 'M6 6l12 12M18 6L6 18',
 } as const
 
 export type IconName = keyof typeof PATHS
@@ -28,13 +32,13 @@ export type IconName = keyof typeof PATHS
 export function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
 	return (
 		<svg
-			className="icon"
+			className="shrink-0"
 			width={size}
 			height={size}
 			viewBox="0 0 24 24"
 			fill="none"
 			stroke="currentColor"
-			strokeWidth={2.25}
+			strokeWidth={1.75}
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			aria-hidden="true"
@@ -45,14 +49,14 @@ export function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
 	)
 }
 
-// Logotipo: el rayo en una baldosa amarilla y el nombre en texto
+// Logotipo: el rayo en una baldosa oscura y el nombre en texto
 export function BrandMark() {
 	return (
 		<>
-			<span className="brand-mark">
-				<Icon name="bolt" size={20} />
+			<span className="grid size-7 place-items-center rounded-md bg-primary text-white">
+				<Icon name="bolt" size={16} />
 			</span>
-			atekos
+			<span className="text-[15px] font-semibold tracking-tight">atekos</span>
 		</>
 	)
 }

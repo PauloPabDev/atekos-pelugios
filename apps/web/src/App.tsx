@@ -3,6 +3,7 @@ import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigat
 import type { User } from '@atekos/shared'
 import * as api from './api'
 import { BrandMark, Icon, type IconName } from './components/Icon'
+import { Loading } from './components/ui'
 import { Login, Register } from './pages/Auth'
 import { Authorize } from './pages/Authorize'
 import { Contract } from './pages/Contract'
@@ -42,7 +43,7 @@ const TABS: [to: string, label: string, icon: IconName][] = [
 	['/contrato', 'Contrato', 'doc'],
 ]
 
-// Marco común: marca, pestañas (abajo en el móvil, a la izquierda en escritorio) y salir
+// Marco común: barra lateral en escritorio; en el móvil, cabecera arriba y pestañas abajo (el pulgar llega)
 function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 	const qc = useQueryClient()
 	const navigate = useNavigate()
@@ -57,13 +58,20 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 	const { pathname } = useLocation()
 
 	return (
-		<div className={tabs ? 'app has-nav' : 'app'}>
-			<header className="topbar">
-				<Link to="/" className="brand">
+		<div className={tabs ? 'min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]' : 'min-h-dvh'}>
+			<header
+				className={`sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 ${
+					tabs ? 'lg:h-dvh lg:flex-col lg:items-stretch lg:gap-1 lg:border-r lg:border-b-0 lg:px-3 lg:py-5' : ''
+				}`}
+			>
+				<Link to="/" className="flex items-center gap-2.5 rounded-md px-1 lg:mb-5">
 					<BrandMark />
 				</Link>
 				{tabs && (
-					<nav aria-label="Principal" className="tabs">
+					<nav
+						aria-label="Principal"
+						className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:static lg:flex lg:flex-col lg:gap-0.5 lg:border-0 lg:p-0"
+					>
 						{TABS.map(([to, label, icon]) => (
 							<NavLink
 								key={to}
@@ -71,33 +79,52 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 								end={to === '/'}
 								// El detalle de un dispositivo cuelga de «/», que necesita end para no casar con todo
 								className={({ isActive }) =>
-									isActive || (to === '/' && pathname.startsWith('/devices/')) ? 'active' : undefined
+									`flex h-12 flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium transition-colors lg:h-9 lg:flex-row lg:justify-start lg:gap-2.5 lg:px-2.5 lg:text-sm ${
+										isActive || (to === '/' && pathname.startsWith('/devices/'))
+											? 'text-fg lg:bg-subtle'
+											: 'text-fg-subtle hover:text-fg lg:text-fg-muted lg:hover:bg-subtle'
+									}`
 								}
 							>
-								<Icon name={icon} />
+								<Icon name={icon} size={20} />
 								{label}
 							</NavLink>
 						))}
 					</nav>
 				)}
-				<div className="who">
+				<div
+					className={`ml-auto flex items-center gap-2 ${tabs ? 'lg:mt-auto lg:ml-0 lg:border-t lg:border-line lg:pt-3' : ''}`}
+				>
 					{user ? (
 						<>
-							<span className="user-chip">{user.username}</span>
-							<button type="button" className="ghost" onClick={() => logout.mutate()} disabled={logout.isPending}>
+							<span className="flex min-w-0 items-center gap-2 text-sm font-medium lg:flex-1 lg:px-1">
+								<span
+									aria-hidden="true"
+									className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-hover"
+								>
+									{user.username.slice(0, 1).toUpperCase()}
+								</span>
+								<span className="truncate">{user.username}</span>
+							</span>
+							<button
+								type="button"
+								className="btn btn-ghost"
+								onClick={() => logout.mutate()}
+								disabled={logout.isPending}
+							>
 								Salir
 							</button>
 						</>
 					) : (
-						<Link to="/" className="button primary">
+						<Link to="/" className="btn btn-primary">
 							Entrar
 						</Link>
 					)}
 				</div>
 			</header>
-			<main className="page">
+			<main className={`mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10 ${tabs ? 'pb-28 lg:pb-12' : ''}`}>
 				{logout.error && (
-					<p role="alert" className="error">
+					<p role="alert" className="alert alert-error mb-4">
 						{logout.error.message}
 					</p>
 				)}
@@ -114,20 +141,25 @@ function Session() {
 
 	if (me.isPending)
 		return (
-			<main className="auth">
-				<p className="loading">Cargando…</p>
+			<main className="grid min-h-dvh place-items-center">
+				<Loading />
 			</main>
 		)
 	if (me.error instanceof api.HttpError && me.error.status === 401)
 		return <Navigate to={`/login?next=${encodeURIComponent(pathname + search)}`} replace />
 	if (me.error)
 		return (
-			<main className="auth">
-				<div className="auth-box stack">
-					<p role="alert" className="error">
+			<main className="grid min-h-dvh place-items-center px-4">
+				<div className="card w-full max-w-sm space-y-4 p-6">
+					<p role="alert" className="alert alert-error">
 						No se pudo cargar la sesión: {me.error.message}
 					</p>
-					<button type="button" className="primary" onClick={() => me.refetch()} disabled={me.isFetching}>
+					<button
+						type="button"
+						className="btn btn-primary w-full"
+						onClick={() => me.refetch()}
+						disabled={me.isFetching}
+					>
 						Reintentar
 					</button>
 				</div>
@@ -147,13 +179,11 @@ function Open() {
 
 function NotFound() {
 	return (
-		<div className="empty">
-			<span className="tile pink">
-				<Icon name="spark" size={32} />
-			</span>
-			<h1>Página no encontrada</h1>
-			<p className="muted">El enlace está roto o la página ya no existe.</p>
-			<Link to="/" className="button primary">
+		<div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
+			<p className="font-mono text-sm text-fg-subtle">404</p>
+			<h1 className="mt-2">Página no encontrada</h1>
+			<p className="mt-2 text-sm text-fg-muted">El enlace está roto o la página ya no existe.</p>
+			<Link to="/" className="btn btn-primary mt-6">
 				Ir a mis dispositivos
 			</Link>
 		</div>

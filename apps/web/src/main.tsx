@@ -2,8 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-// La base va antes que App: el CSS de cada página se carga después y puede afinarla
-import './styles.css'
+// Tailwind y los tokens Grafito antes que App
+import './index.css'
 import { App } from './App'
 import { HttpError } from './api'
 
