@@ -1,9 +1,9 @@
-import { useEffect, useReducer } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import * as api from '../api'
 import { EmptyState, IconTile, Loading } from '../components/ui'
 import { useDeviceSocket } from '../hooks/useDeviceSocket'
+import { useNow } from '../hooks/useNow'
 import { ago, DEVICE_ICON, fullDate } from '../labels'
 
 // Sin login: si es privado la API responde 404 (§6), igual que si no existe
@@ -11,12 +11,7 @@ export function PublicDevice() {
 	const { id = '' } = useParams()
 	const device = useQuery({ queryKey: ['device', id], queryFn: () => api.getDevice(id) })
 	const live = useDeviceSocket(device.data ? [id] : [])
-	// Repinta cada 30 s para que «Actualizado hace …» no se quede congelado en una pantalla abierta
-	const [, tick] = useReducer((n: number) => n + 1, 0)
-	useEffect(() => {
-		const t = setInterval(tick, 30_000)
-		return () => clearInterval(t)
-	}, [])
+	const now = useNow(30_000)
 
 	if (device.isPending) return <Loading />
 	if (device.error instanceof api.HttpError && device.error.status === 404)
@@ -45,7 +40,7 @@ export function PublicDevice() {
 				{d.state ? 'Encendido' : 'Apagado'}
 			</p>
 			<div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-fg-muted">
-				{live && (
+				{live === 'live' && (
 					<span className="badge badge-success">
 						<span className="dot dot-live" />
 						En vivo
@@ -54,7 +49,7 @@ export function PublicDevice() {
 				<span>
 					Actualizado{' '}
 					<time dateTime={d.updatedAt} title={fullDate(d.updatedAt)}>
-						{ago(d.updatedAt)}
+						{ago(d.updatedAt, now)}
 					</time>
 				</span>
 			</div>

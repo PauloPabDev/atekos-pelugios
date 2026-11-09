@@ -4,6 +4,7 @@ import type {
 	CreateDeviceInput,
 	CreatedApiToken,
 	CreateDisplayInput,
+	CreateScheduleInput,
 	CreateTokenInput,
 	Device,
 	DeviceEvent,
@@ -20,7 +21,10 @@ import type {
 	PatchDataInput,
 	PatchDeviceInput,
 	PatchDisplayInput,
+	PatchScheduleInput,
 	RegisterInput,
+	Schedule,
+	TelemetryReading,
 	User,
 } from '@atekos/shared'
 
@@ -78,6 +82,12 @@ export const getContract = (file: 'asyncapi.json' | 'openapi.json') =>
 // El id viene de la URL: se codifica para que no pueda salirse de /devices/…
 const dev = (id: string) => `/devices/${encodeURIComponent(id)}`
 
+// «?from=…&limit=…» sin los que faltan
+const qs = (q: Record<string, string | number | undefined>) => {
+	const s = new URLSearchParams(Object.entries(q).flatMap(([k, v]) => (v === undefined ? [] : [[k, String(v)]])))
+	return s.toString() ? `?${s}` : ''
+}
+
 export const me = () => request<User>('GET', '/auth/me')
 export const login = (input: LoginInput) => request<unknown>('POST', '/auth/login', input)
 export const register = (input: RegisterInput) => request<unknown>('POST', '/auth/register', input)
@@ -90,7 +100,14 @@ export const patchDevice = (id: string, input: PatchDeviceInput) => request<Devi
 export const deleteDevice = (id: string) => request<unknown>('DELETE', dev(id))
 export const toggleDevice = (id: string) => request<Device>('POST', `${dev(id)}/toggle`)
 export const patchData = (id: string, data: PatchDataInput) => request<Device>('PATCH', `${dev(id)}/data`, data)
-export const listEvents = (id: string) => request<DeviceEvent[]>('GET', `${dev(id)}/events?limit=50`)
+// La API admite hasta 200
+export const listEvents = (id: string, limit = 50) => request<DeviceEvent[]>('GET', `${dev(id)}/events?limit=${limit}`)
+// Devuelve el dispositivo sin esa clave en su data
+export const deleteDeviceDataKey = (id: string, key: string) =>
+	request<Device>('DELETE', `${dev(id)}/data/${encodeURIComponent(key)}`)
+// Sin from ni to, las 24 h anteriores; limit hasta 1000 (100 por defecto)
+export const getTelemetry = (id: string, q: { from?: string; to?: string; limit?: number } = {}) =>
+	request<TelemetryReading[]>('GET', `${dev(id)}/telemetry${qs(q)}`)
 
 export const listTokens = () => request<ApiToken[]>('GET', '/tokens')
 export const createToken = (input: CreateTokenInput) => request<CreatedApiToken>('POST', '/tokens', input)
@@ -129,3 +146,15 @@ export const patchDisplayData = (deviceId: string, values: DisplayValues) =>
 export const listDisplayEvents = (deviceId: string) => request<DisplayEvent[]>('GET', `${disp(deviceId)}/events`)
 export const sendDisplayCommand = (deviceId: string, command: DisplayCommand) =>
 	request<{ ok: true }>('POST', `${disp(deviceId)}/commands`, command)
+
+// Programas: los de un dispositivo (id) o una pantalla (id = hardwareId, md-…), y todos los míos
+export type ScheduleTarget = Schedule['target']
+const schedulesOf = (t: ScheduleTarget) => `${t.kind === 'device' ? dev(t.id) : disp(t.id)}/schedules`
+const sched = (id: string) => `/schedules/${encodeURIComponent(id)}`
+
+export const listSchedules = (t: ScheduleTarget) => request<Schedule[]>('GET', schedulesOf(t))
+export const listAllSchedules = () => request<Schedule[]>('GET', '/schedules')
+export const createSchedule = (t: ScheduleTarget, input: CreateScheduleInput) =>
+	request<Schedule>('POST', schedulesOf(t), input)
+export const patchSchedule = (id: string, patch: PatchScheduleInput) => request<Schedule>('PATCH', sched(id), patch)
+export const deleteSchedule = (id: string) => request<unknown>('DELETE', sched(id))

@@ -25,7 +25,8 @@ export const EVENT: Record<string, string> = {
 
 export const ACTOR: Record<string, string> = { anonymous: 'Anónimo', user: 'Tú', token: 'Token' }
 
-export const SOURCE: Record<string, string> = { http: 'Petición web', ws: 'Conexión en vivo' }
+// http no es solo la web: también los tokens (un ESP por REST), así que no vale «App»
+export const SOURCE: Record<string, string> = { http: 'Petición web', ws: 'Conexión en vivo', schedule: 'Programa' }
 
 // El crudo como respaldo: la API puede traer un valor que la web aún no conoce
 export const label = (map: Record<string, string>, raw: string) => map[raw] ?? raw
@@ -49,3 +50,29 @@ export function ago(ts: string, now = Date.now()) {
 }
 
 export const fullDate = (ts: string) => new Date(ts).toLocaleString('es')
+
+const weekday = new Intl.DateTimeFormat('es', { weekday: 'long' })
+const month = new Intl.DateTimeFormat('es', { month: 'long' })
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+
+// Día local: «Hoy», «Ayer», «lunes 9 de noviembre» (y el año si no es el actual)
+export function dayLabel(d: Date, now = new Date()) {
+	const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+	if (dayKey(d) === dayKey(now)) return 'Hoy'
+	if (dayKey(d) === dayKey(yesterday)) return 'Ayer'
+	const year = d.getFullYear() === now.getFullYear() ? '' : ` de ${d.getFullYear()}`
+	return `${weekday.format(d)} ${d.getDate()} de ${month.format(d)}${year}`
+}
+
+// Agrupa por día local respetando el orden de entrada (la API ya los da del más reciente al más antiguo)
+export function groupByDay<T>(items: readonly T[], getDate: (item: T) => string | Date, now = new Date()) {
+	const groups: { day: string; label: string; items: T[] }[] = []
+	for (const item of items) {
+		const d = new Date(getDate(item))
+		const day = dayKey(d)
+		const last = groups.at(-1)
+		if (last?.day === day) last.items.push(item)
+		else groups.push({ day, label: dayLabel(d, now), items: [item] })
+	}
+	return groups
+}

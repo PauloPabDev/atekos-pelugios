@@ -33,6 +33,8 @@
 
 	--animate-fade-out: fade-out 400ms ease 3s forwards;
 	--animate-fade-in: fade-in 160ms ease-out;
+	/* Destello de lo que llega en vivo; se usa con motion-safe: */
+	--animate-flash: flash 1.2s ease-out;
 
 	@keyframes fade-out {
 		to {
@@ -45,6 +47,16 @@
 			transform: translateY(2px);
 		}
 	}
+	@keyframes flash {
+		from {
+			background-color: var(--color-brand-soft);
+		}
+	}
+}
+
+/* Borde derecho difuminado en lo que hace scroll horizontal (pestañas): que el corte diga «hay más» */
+@utility mask-fade-r {
+	mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
 }
 
 @layer base {
@@ -300,12 +312,16 @@
 		@apply inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-line-strong border-t-fg;
 	}
 
-	/* Navegación dentro de una página larga: anclas con aspecto de pestañas (todo sigue montado) */
+	/* Pestañas de sección: enlaces (NavLink) con la activa en aria-current; en el móvil, scroll horizontal */
 	.subnav {
-		@apply -mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] sm:mx-0 sm:px-0;
+		@apply -mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] max-sm:mask-fade-r sm:mx-0 sm:px-0;
 	}
 
 	.subnav a {
 		@apply -mb-px inline-flex h-11 shrink-0 items-center border-b-2 border-transparent px-3 text-sm font-medium text-fg-muted hover:border-line-strong hover:text-fg sm:h-10;
+	}
+
+	.subnav a[aria-current='page'] {
+		@apply border-fg text-fg;
 	}
 }
