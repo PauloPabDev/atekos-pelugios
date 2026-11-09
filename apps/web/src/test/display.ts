@@ -1,4 +1,4 @@
-import type { DisplayDetail, DisplayTemplate } from '@atekos/shared'
+import type { DisplayDetail, DisplayEvent, DisplayTemplate } from '@atekos/shared'
 import { mockFetch, user } from './utils'
 
 // Una pantalla «Meta» desconectada con la plantilla «inicio» activa: lo que usan los tests de sus pestañas
@@ -7,6 +7,13 @@ export const inicio: DisplayTemplate = {
 	id: 'inicio',
 	version: 1,
 	elements: [{ type: 'text', x: 10, y: 10, size: 2, bind: 'mensaje' }],
+	actions: [],
+}
+// Otra plantilla guardada, no activa
+export const noche: DisplayTemplate = {
+	id: 'noche',
+	version: 2,
+	elements: [{ type: 'text', x: 10, y: 10, value: 'NOCHE' }],
 	actions: [],
 }
 export const detail: DisplayDetail = {
@@ -21,6 +28,23 @@ export const detail: DisplayDetail = {
 	templates: [{ id: 'inicio', version: 1 }],
 	values: { mensaje: 'HOLA' },
 }
+// Un toque aceptado de ahora mismo; cada test cambia lo que mira
+export const touch = (extra: Partial<DisplayEvent> = {}): DisplayEvent => ({
+	ts: new Date().toISOString(),
+	eventId: crypto.randomUUID(),
+	actionId: 'pulsar',
+	name: 'data.set',
+	x: 0,
+	y: 0,
+	templateId: 'inicio',
+	templateVersion: 1,
+	status: 'ok',
+	toast: null,
+	source: 'touch',
+	button: null,
+	press: null,
+	...extra,
+})
 export const page = '/displays/md-34B7DA01ABCD'
 export const base = `/api/v1${page}`
 

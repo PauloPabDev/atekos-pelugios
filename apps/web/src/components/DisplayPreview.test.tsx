@@ -187,3 +187,13 @@ test('showActions marca en cian la zona de un botón físico y sin zona no dibuj
 	expect(zones[0]).toHaveAttribute('stroke', '#00FFFF')
 	expect(within(container.querySelector('.actions')!).getByText('pulsar: botón 0 (corta)')).toBeInTheDocument()
 })
+
+test('mini: el mismo dibujo, decorativo y sin pie', () => {
+	const { container } = render(
+		<DisplayPreview template={tpl([{ type: 'text', x: 10, y: 10, bind: 'msg' }])} values={{ msg: 'HOLA' }} mini />,
+	)
+	expect(screen.queryByRole('img')).toBeNull()
+	expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+	expect(container.querySelector('text')).toHaveTextContent('HOLA')
+	expect(container.querySelector('figcaption')).toBeNull()
+})

@@ -169,64 +169,72 @@ function Element({ e }: { e: ResolvedElement }) {
 
 // Vista previa SVG de una plantilla: función pura de sus props (por eso SVG y no canvas: se prueba en jsdom).
 // `frame` es el fotograma de la animación que se dibuja encima de los elementos.
+// `mini`: miniatura de una lista, sin pie y decorativa (la fila ya dice qué plantilla es).
 export function DisplayPreview({
 	template,
 	values,
 	showActions = false,
 	frame = 0,
+	mini = false,
 }: {
 	template: DisplayTemplate
 	values: DisplayValues
 	showActions?: boolean
 	frame?: number
+	mini?: boolean
 }) {
 	const { width, height } = displaySize(template.rotation)
 	const elements = [...template.elements, ...(template.animation?.frames[frame]?.elements ?? [])]
+	const svg = (
+		<svg
+			viewBox={`0 0 ${width} ${height}`}
+			width={width * 2}
+			height={height * 2}
+			shapeRendering="crispEdges"
+			fontFamily="ui-monospace, monospace"
+			{...(mini
+				? { 'aria-hidden': true }
+				: { role: 'img', 'aria-label': `Vista previa de ${template.id} v${template.version}` })}
+		>
+			<rect width={width} height={height} fill={template.background ?? '#000000'} />
+			{elements.map((e, i) => {
+				const r = resolveElement(e, values)
+				return r && <Element key={i} e={r} />
+			})}
+			{showActions && (
+				<g className="actions">
+					{template.actions.flatMap((a) => {
+						if (a.x === undefined || a.y === undefined || a.w === undefined || a.h === undefined) return []
+						// tap en magenta; la zona que resalta un botón físico, en cian
+						const color = a.trigger === 'button' ? '#00FFFF' : '#FF00FF'
+						const title =
+							a.trigger === 'button'
+								? `${a.id}: botón ${a.button} (${a.press === 'long' ? 'larga' : 'corta'})`
+								: `${a.id} (${a.mode})`
+						return (
+							<rect
+								key={a.id}
+								x={a.x + 0.5}
+								y={a.y + 0.5}
+								width={a.w - 1}
+								height={a.h - 1}
+								fill={color}
+								fillOpacity={0.15}
+								stroke={color}
+								strokeDasharray="3 2"
+							>
+								<title>{title}</title>
+							</rect>
+						)
+					})}
+				</g>
+			)}
+		</svg>
+	)
+	if (mini) return svg
 	return (
 		<figure>
-			<svg
-				viewBox={`0 0 ${width} ${height}`}
-				width={width * 2}
-				height={height * 2}
-				shapeRendering="crispEdges"
-				fontFamily="ui-monospace, monospace"
-				role="img"
-				aria-label={`Vista previa de ${template.id} v${template.version}`}
-			>
-				<rect width={width} height={height} fill={template.background ?? '#000000'} />
-				{elements.map((e, i) => {
-					const r = resolveElement(e, values)
-					return r && <Element key={i} e={r} />
-				})}
-				{showActions && (
-					<g className="actions">
-						{template.actions.flatMap((a) => {
-							if (a.x === undefined || a.y === undefined || a.w === undefined || a.h === undefined) return []
-							// tap en magenta; la zona que resalta un botón físico, en cian
-							const color = a.trigger === 'button' ? '#00FFFF' : '#FF00FF'
-							const title =
-								a.trigger === 'button'
-									? `${a.id}: botón ${a.button} (${a.press === 'long' ? 'larga' : 'corta'})`
-									: `${a.id} (${a.mode})`
-							return (
-								<rect
-									key={a.id}
-									x={a.x + 0.5}
-									y={a.y + 0.5}
-									width={a.w - 1}
-									height={a.h - 1}
-									fill={color}
-									fillOpacity={0.15}
-									stroke={color}
-									strokeDasharray="3 2"
-								>
-									<title>{title}</title>
-								</rect>
-							)
-						})}
-					</g>
-				)}
-			</svg>
+			{svg}
 			{/* Ancho 0 y mínimo 100%: el pie no ensancha el bisel, toma el ancho de la pantalla */}
 			<figcaption className="mt-1.5 w-0 min-w-full text-xs text-zinc-400 max-lg:truncate">
 				{template.id} v{template.version}. Vista previa aproximada: la fuente real del LCD es distinta.
