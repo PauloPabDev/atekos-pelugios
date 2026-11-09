@@ -9,9 +9,12 @@ import {
 	timestamp,
 	uniqueIndex,
 	primaryKey,
+	index,
+	check,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js'
-import type { DisplayTemplate, DisplayValues } from '@atekos/shared'
+import type { DisplayTemplate, DisplayValues, ScheduleAction, ScheduleResult, ScheduleWhen } from '@atekos/shared'
 
 export const visibility = pgEnum('visibility', ['public', 'private'])
 export const deviceType = pgEnum('device_type', ['light', 'switch', 'sensor', 'generic'])
@@ -120,3 +123,32 @@ export const oauthGrants = pgTable('oauth_grants', {
 	revokedAt: timestamp('revoked_at', { withTimezone: true }),
 	createdAt: createdAt(),
 })
+
+// Programas: acción recurrente (o de una vez) sobre un dispositivo o una pantalla. next_run_at null = no volverá a correr.
+export const schedules = pgTable(
+	'schedules',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		ownerId: uuid('owner_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		deviceId: uuid('device_id').references(() => devices.id, { onDelete: 'cascade' }),
+		displayId: uuid('display_id').references(() => displays.id, { onDelete: 'cascade' }),
+		name: text('name').notNull().default(''),
+		when: jsonb('when').$type<ScheduleWhen>().notNull(),
+		action: jsonb('action').$type<ScheduleAction>().notNull(),
+		enabled: boolean('enabled').notNull().default(true),
+		nextRunAt: timestamp('next_run_at', { withTimezone: true }),
+		lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+		lastResult: text('last_result').$type<ScheduleResult>(),
+		createdAt: createdAt(),
+	},
+	(t) => [
+		check('schedules_one_target', sql`num_nonnulls(${t.deviceId}, ${t.displayId}) = 1`),
+		index('schedules_due')
+			.on(t.nextRunAt)
+			.where(sql`${t.enabled}`),
+		index('schedules_device').on(t.deviceId),
+		index('schedules_display').on(t.displayId),
+	],
+)

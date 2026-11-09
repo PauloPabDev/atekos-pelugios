@@ -3,7 +3,7 @@ import type { Logger } from 'pino'
 import type { Actor } from '../domain/policy'
 import type { DeviceCache, DeviceEventBus, DeviceEventLog, NewDeviceEvent } from '../domain/ports'
 
-export type Source = 'http' | 'ws'
+export type Source = 'http' | 'ws' | 'schedule'
 export type DeviceChange = { type: DeviceEventType; before: Device | null; after: Device; actor: Actor; source: Source }
 export type OnDeviceChanged = (change: DeviceChange) => Promise<void>
 

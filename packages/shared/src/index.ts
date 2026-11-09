@@ -89,7 +89,8 @@ export const DeviceEvent = z.object({
 	before: Device.nullable(),
 	after: Device.nullable(),
 	actor: z.object({ kind: z.enum(['anonymous', 'user', 'token']), id: z.string().nullable() }),
-	source: z.enum(['http', 'ws']),
+	// schedule: lo hizo un programa del dueño (actor = el dueño)
+	source: z.enum(['http', 'ws', 'schedule']),
 })
 export type DeviceEvent = z.infer<typeof DeviceEvent>
 
@@ -713,3 +714,4 @@ export type DisplayServerMessage = z.infer<typeof DisplayServerMessage>
 
 export * from './image'
 export * from './render'
+export * from './schedule'

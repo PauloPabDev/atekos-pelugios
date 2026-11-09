@@ -24,8 +24,18 @@ const ws = await attachWebSocket(server, c)
 const deviceWs = await attachDeviceWebSocket(server, c)
 server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'api escuchando'))
 
+// Programas: cada 15 s corre los vencidos (precisión de minuto); una vuelta lenta no se solapa con la siguiente
+let ticking = false
+const scheduler = setInterval(async () => {
+	if (ticking) return
+	ticking = true
+	await c.schedules.runDue.execute().catch((err) => logger.error({ err }, 'programas'))
+	ticking = false
+}, 15_000)
+
 const shutdown = (signal: string) => {
 	logger.info({ signal }, 'cerrando')
+	clearInterval(scheduler)
 	server.close(async () => {
 		await c.close()
 		process.exit(0)
