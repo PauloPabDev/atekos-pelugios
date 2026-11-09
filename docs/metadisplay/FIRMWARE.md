@@ -67,7 +67,7 @@ Todo el diseño sale de aquí:
 
 `display.width/height` siguen siendo los del panel en vertical, sea cual sea la rotación de la plantilla.
 
-El servidor guarda la ficha (`firmware`, `board`, `display`, `buttons`, `capabilities`) y la web la enseña en la pestaña «Ajustes» de la pantalla. Una placa que no la manda sigue funcionando: la web dice que no hay datos.
+El servidor guarda la ficha (`firmware`, `board`, `display`, `buttons`, `capabilities`) y la web la enseña en la tarjeta «Placa» de la pestaña «En vivo» de la pantalla. Una placa que no la manda sigue funcionando: la web dice que no hay datos.
 
 ### 2.2 `touch.tap` (pantalla → servidor)
 
@@ -564,7 +564,7 @@ Las pruebas se hacen contra atekos, en local o en producción: se da de alta una
 6. **Corte a medias:** apagar el WiFi durante la descarga. Al volver, la plantilla anterior sigue y la nueva se descarga entera.
 7. **Rotación:** la misma plantilla sencilla con `rotation` 0, 90, 180 y 270. Sin franjas de basura, el origen arriba a la izquierda y el toast y el punto de conexión dentro de la pantalla.
 8. **Memoria:** `ESP.getFreeHeap()` estable después de 20 cambios de plantilla y de 10 minutos de animación.
-9. **Ficha de la placa:** en la web, «Ajustes» de la pantalla muestra placa, chip, firmware, pantalla de 172×320 y el botón 0 «BOOT» (GPIO 9). «Pedir ficha» la vuelve a pedir y la hora de «recibida» cambia.
+9. **Ficha de la placa:** en la web, la tarjeta «Placa» de «En vivo» muestra placa, chip, firmware, pantalla de 172×320 y el botón 0 «BOOT» (GPIO 9). «Pedir ficha» la vuelve a pedir y la hora de «recibida» cambia.
 10. **Desconexión:** desenchufar la placa. En 20 s como mucho la web dice «Sin conexión» con la hora del último contacto.
 11. **Demasiado grande:** con una plantilla que no quepa en la flash, `frag.ack ok:false reason:"too_large"`, y la pantalla sigue con la anterior.
 

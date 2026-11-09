@@ -6,10 +6,12 @@ import * as api from '../../api'
 import { DisplayPreview } from '../../components/DisplayPreview'
 import { Problems } from '../../components/Problems'
 import { Status } from '../../components/Status'
-import { Online } from '../Displays'
+import { fullDate } from '../../labels'
+import { lastSeen, Online } from '../Displays'
 import { NextSchedules } from '../schedules/NextSchedules'
 import { EXPLAIN } from './common'
 import { TouchRow, useTouches } from './DisplayActivity'
+import { DisplayBoard } from './DisplayBoard'
 import { useDisplay } from './DisplayLayout'
 
 // La pantalla no informa de su brillo: se recuerda el último que se envió desde esta pestaña
@@ -56,9 +58,17 @@ export function DisplayLive() {
 					<h2 id="ahora" className="mb-3 text-center lg:text-left">
 						Así se ve ahora
 					</h2>
-					{/* Lo guardado (plantilla activa y sus valores), nunca un borrador */}
-					<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[40svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-18rem)]">
-						<DisplayPreview template={d.template} values={d.values} />
+					{/* Lo guardado (plantilla activa y sus valores), nunca un borrador. Desconectada se ve apagada. */}
+					<div className="relative mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[40svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-18rem)]">
+						<div className={offline ? 'opacity-40 grayscale' : undefined}>
+							<DisplayPreview template={d.template} values={d.values} />
+						</div>
+						{offline && (
+							<span className="badge absolute top-4 left-1/2 -translate-x-1/2 shadow-sm" aria-hidden="true">
+								<span className="dot" />
+								Desconectada
+							</span>
+						)}
 					</div>
 				</section>
 
@@ -71,8 +81,9 @@ export function DisplayLive() {
 						<div className="space-y-5 p-4 sm:p-5">
 							{offline && (
 								<p id="offline-hint" className="alert alert-info">
-									La pantalla no está conectada: el brillo y el refresco no llegarían. Los datos y la plantilla sí se le
-									envían al conectarse.
+									La pantalla no está conectada
+									{d.lastSeenAt && <span title={fullDate(d.lastSeenAt)}> ({lastSeen(d.lastSeenAt)})</span>}: el brillo y
+									el refresco no llegarían. Los datos y la plantilla sí se le envían al conectarse.
 								</p>
 							)}
 							<div>
@@ -128,6 +139,7 @@ export function DisplayLive() {
 						</div>
 					</section>
 
+					<DisplayBoard display={d} />
 					<NextSchedules target={{ kind: 'display', id: d.deviceId }} />
 				</div>
 			</div>
