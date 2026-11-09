@@ -64,7 +64,7 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 					tabs ? 'lg:h-dvh lg:flex-col lg:items-stretch lg:gap-1 lg:border-r lg:border-b-0 lg:px-3 lg:py-5' : ''
 				}`}
 			>
-				<Link to="/" className="flex items-center gap-2.5 rounded-md px-1 lg:mb-5">
+				<Link to="/" className={`flex items-center gap-2.5 rounded-md px-1 ${tabs ? 'lg:mb-5' : ''}`}>
 					<BrandMark />
 				</Link>
 				{tabs && (

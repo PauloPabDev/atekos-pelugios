@@ -62,13 +62,14 @@ export function Devices() {
 						<Status m={create} text="Dispositivo creado." />
 						<button
 							type="button"
-							className="btn btn-primary"
+							className="btn btn-primary max-sm:w-11 max-sm:px-0"
 							aria-expanded={formOpen}
 							aria-controls="nuevo"
 							onClick={() => setOpen(!formOpen)}
 						>
 							<Icon name="plus" size={16} />
-							Nuevo dispositivo
+							{/* En el móvil solo el icono: el texto queda para el lector de pantalla */}
+							<span className="sr-only sm:not-sr-only">Nuevo dispositivo</span>
 						</button>
 					</>
 				}
