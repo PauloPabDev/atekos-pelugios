@@ -163,7 +163,7 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 							<div className="sticky top-14 z-20 -mx-4 border-b border-line bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
 								{/* Ancho y alto auto: manda el tamaño ×2 del SVG, recortado por los máximos sin deformarse;
 								    en el móvil, más de 24svh deja el JSON en pocas líneas entre la cabecera, el pie y las pestañas */}
-								<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[24svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-14rem)]">
+								<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[24svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-22rem)]">
 									<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
 								</div>
 								{!draft.data && (
