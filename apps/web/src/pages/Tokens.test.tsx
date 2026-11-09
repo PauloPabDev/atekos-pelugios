@@ -140,6 +140,7 @@ test('apps conectadas: lista los grants y Revocar llama a DELETE y recarga la li
 	expect(list).toHaveTextContent('nunca')
 
 	await userEvent.click(within(list).getByRole('button', { name: 'Revocar Claude' }))
+	await userEvent.click(within(list).getByRole('button', { name: 'Sí, revocar' }))
 
 	expect(await screen.findByText('Ninguna app conectada.')).toBeInTheDocument()
 	expect(fetch).toHaveBeenCalledWith(`/api/v1/oauth/grants/${grant.id}`, expect.objectContaining({ method: 'DELETE' }))

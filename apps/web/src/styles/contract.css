@@ -1,0 +1,52 @@
+/* Contrato MetaDisplay. Se carga antes que styles.css (main.tsx importa App primero),
+   así que cada regla va colgada de .contract para ganar a la base. */
+
+.contract .cards .card-title {
+	display: block;
+}
+
+.contract .cards .muted {
+	margin: 0.25rem 0 0;
+}
+
+/* Método REST por color (GET cian) sin partir el <code> «POST /ruta»: los tests lo buscan entero */
+.contract td[data-method] code {
+	display: inline-block;
+	padding: 0.125rem 0.625rem;
+	border: var(--bw-thin) solid var(--line);
+	border-radius: var(--r-pill);
+	background: var(--cyan);
+	color: var(--on-pop);
+	font-weight: 700;
+	word-break: normal;
+}
+
+.contract td[data-method='post'] code {
+	background: var(--green);
+}
+
+.contract td[data-method='put'] code,
+.contract td[data-method='patch'] code {
+	background: var(--yellow);
+}
+
+.contract td[data-method='delete'] code {
+	background: var(--pink);
+}
+
+/* Plegables de los esquemas como pastilla */
+.contract summary {
+	width: fit-content;
+	margin: 0.375rem 0;
+	padding: 0 1rem 0 0.875rem;
+	border: var(--bw-thin) solid var(--line);
+	border-radius: var(--r-pill);
+	background: var(--surface-2);
+	font-family: var(--mono);
+	font-size: 0.875rem;
+}
+
+.contract details[open] > summary {
+	background: var(--yellow);
+	color: var(--on-pop);
+}
