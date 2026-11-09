@@ -71,6 +71,10 @@ export function errorLines(e: Error | null, explain: Record<string, string> = {}
 	]
 }
 
+// Contrato MetaDisplay, público y generado por la API desde los zod; la página tipa solo lo que lee
+export const getContract = (file: 'asyncapi.json' | 'openapi.json') =>
+	request<Record<string, unknown>>('GET', `/contract/${file}`)
+
 // El id viene de la URL: se codifica para que no pueda salirse de /devices/…
 const dev = (id: string) => `/devices/${encodeURIComponent(id)}`
 

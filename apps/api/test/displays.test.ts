@@ -1,5 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { CreatedApiToken, Display, DisplayDetail, DisplayEvent, type DisplayTemplate, type Scope } from '@atekos/shared'
+import {
+	CreatedApiToken,
+	DISPLAY_MAX_TEMPLATE_BYTES,
+	Display,
+	DisplayDetail,
+	DisplayEvent,
+	encodeBase64,
+	type DisplayTemplate,
+	type Scope,
+} from '@atekos/shared'
 import { eq } from 'drizzle-orm'
 import { createClient } from 'redis'
 import request from 'supertest'
@@ -174,18 +183,7 @@ describe('displays', () => {
 			.put(api(`${d.path}/template`))
 			.send({ ...goal, version: 2 ** 31 })
 			.expect(422)
-		const big = {
-			id: 'grande',
-			version: 1,
-			elements: Array.from({ length: 45 }, () => ({ type: 'text', x: 0, y: 0, value: 'ñ'.repeat(140) })),
-			actions: [],
-		}
-		const tooLarge = await agent
-			.put(api(`${d.path}/template`))
-			.send(big)
-			.expect(413)
-		expect(tooLarge.body.error).toBe('message_too_large')
-		expect(await drain(d.id)).toEqual([])
+		expect(await drain(d.id)).toEqual([]) // el 413 por tope está en «tope: …»
 		const detail = DisplayDetail.parse((await agent.get(api(d.path)).expect(200)).body)
 		expect(detail.template).toEqual(v2)
 		expect(detail.templates).toEqual([
@@ -300,6 +298,72 @@ describe('displays', () => {
 			.expect(422)
 		expect(await drain(d.id)).toEqual([])
 		expect(Object.keys((await agent.get(api(d.path)).expect(200)).body.values)).toHaveLength(64)
+	})
+
+	it('tope: una plantilla de ~150 KB entra (y otras rutas siguen en 32kb); un cuerpo de más del tope → 413', async () => {
+		const { agent } = await registered()
+		const d = await createDisplay(agent)
+		await drain(d.id)
+		// Pantalla completa sin comprimir: 172×320×2 bytes en base64.
+		const image = {
+			type: 'image',
+			x: 0,
+			y: 0,
+			w: 172,
+			h: 320,
+			encoding: 'rgb565',
+			data: encodeBase64(new Uint8Array(172 * 320 * 2)),
+		}
+		const big = { ...goal, id: 'foto', version: 1, elements: [image, ...goal.elements] } as DisplayTemplate
+		expect(JSON.stringify(big).length).toBeGreaterThan(140_000)
+		await agent
+			.put(api(`${d.path}/template`))
+			.send(big)
+			.expect(200)
+		expect((await drain(d.id)).map((m) => m.type)).toEqual(['template.set', 'data.update'])
+		expect(DisplayDetail.parse((await agent.get(api(d.path)).expect(200)).body).template).toEqual(big)
+
+		const over = await agent
+			.put(api(`${d.path}/template`))
+			.send({ ...goal, relleno: 'x'.repeat(DISPLAY_MAX_TEMPLATE_BYTES) })
+			.expect(413)
+		expect(over.body.error).toBe('message_too_large')
+		const tokens = await agent
+			.post(api('/tokens'))
+			.send({ name: 'x'.repeat(40_000), scopes: ['devices:read'] })
+			.expect(413)
+		expect(tokens.body.error).toBe('message_too_large')
+		expect(await drain(d.id)).toEqual([])
+	})
+
+	it('params de la plantilla activa: un valor de otro tipo o fuera de rango → 422 sin publicar', async () => {
+		const { agent } = await registered()
+		const d = await createDisplay(agent)
+		const t = {
+			...goal,
+			id: 'con-params',
+			version: 1,
+			params: { progress: { type: 'number', min: 0, max: 100, default: 0 }, targetText: { type: 'string' } },
+		} as DisplayTemplate
+		await agent
+			.put(api(`${d.path}/template`))
+			.send(t)
+			.expect(200)
+		await drain(d.id)
+		const bad = await agent
+			.patch(api(`${d.path}/data`))
+			.send({ progress: 'mucho' })
+			.expect(422)
+		expect(bad.body).toMatchObject({ error: 'invalid_data', issues: [{ path: ['progress'] }] })
+		await agent
+			.put(api(`${d.path}/data`))
+			.send({ progress: 101 })
+			.expect(422)
+		expect(await drain(d.id)).toEqual([])
+		await agent
+			.patch(api(`${d.path}/data`))
+			.send({ progress: 50, targetText: null, libre: true })
+			.expect(200)
 	})
 
 	it('comandos: offline → 409; trust.* y ota → 422; con presencia → 202, publicado y auditado', async () => {
@@ -444,6 +508,9 @@ describe('displays', () => {
 				templateVersion: 1,
 				status: 'ok',
 				toast: 'Datos actualizados',
+				source: 'button',
+				button: 0,
+				press: 'short',
 			})
 		await touch('e1', 1)
 		await touch('e2', 2)
@@ -471,6 +538,9 @@ describe('displays', () => {
 			templateVersion: 1,
 			status: 'ok',
 			toast: 'Datos actualizados',
+			source: 'button',
+			button: 0,
+			press: 'short',
 		})
 		expect(body[0].ts).toBe(new Date(body[0].ts).toISOString())
 		await agent

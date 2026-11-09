@@ -1,12 +1,22 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
-import { DISPLAY_MAX_FRAME, DisplayTemplate, DisplayValues } from '@atekos/shared'
-import type { DisplayCommand, DisplayDetail as Detail } from '@atekos/shared'
+import {
+	checkParams,
+	currentFrame,
+	DISPLAY_MAX_TEMPLATE_BYTES,
+	displaySize,
+	DisplayTemplate,
+	DisplayValues,
+	encodeImage,
+	truthy,
+	withDefaults,
+} from '@atekos/shared'
+import type { DisplayCommand, DisplayDetail as Detail, DisplayEvent } from '@atekos/shared'
 import * as api from '../api'
 import { DisplayPreview } from '../components/DisplayPreview'
 import { Problems } from '../components/Problems'
-import { goalData, goalTemplate, statusTemplate } from '../examples'
+import { goalData, goalTemplate, showcaseTemplate, statusTemplate } from '../examples'
 import { Online } from './Displays'
 
 const fmt = (v: unknown) => JSON.stringify(v, null, 2)
@@ -14,7 +24,7 @@ const fmt = (v: unknown) => JSON.stringify(v, null, 2)
 // Errores de /displays (DISENO §3) que el usuario puede entender y corregir desde aquí
 const EXPLAIN: Record<string, string> = {
 	version_not_incremented: 'Ya hay una plantilla con ese id y una versión igual o mayor: súbela con «version +1».',
-	message_too_large: `El mensaje para la pantalla superaría los ${DISPLAY_MAX_FRAME} bytes: quita elementos o acorta textos.`,
+	message_too_large: `La plantilla o los datos superan el tope de la API (DISPLAY_MAX_TEMPLATE_BYTES, ${DISPLAY_MAX_TEMPLATE_BYTES / 1_048_576} MB por defecto): reduce o comprime las imágenes, o quita elementos.`,
 	invalid_template: 'La API rechazó la plantilla:',
 	invalid_data: 'La API rechazó los datos:',
 	device_offline: 'La pantalla no está conectada: el comando no se envió.',
@@ -77,8 +87,12 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 	// Textarea controlado: el polling no pisa el borrador
 	const [text, setText] = useState(() => fmt(d.template))
 	const [showActions, setShowActions] = useState(false)
+	const [playing, setPlaying] = useState(false)
 	const pick = useRef<HTMLSelectElement>(null)
-	const draft = validate(DisplayTemplate, text)
+	// Memo: el timer de la animación re-renderiza cada 50 ms y una plantilla puede pesar 1 MB
+	const draft = useMemo(() => validate(DisplayTemplate, text), [text])
+	const shown = draft.data ?? d.template
+	const frame = useFrame(playing ? shown.animation : undefined)
 
 	const saveDraft = (active: boolean) => {
 		if (draft.data) save.mutate({ t: draft.data, active })
@@ -109,12 +123,18 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 				<h2>Plantilla</h2>
 				<div className="editor">
 					<div>
-						<DisplayPreview template={draft.data ?? d.template} values={d.values} showActions={showActions} />
+						<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
 						{!draft.data && <p className="muted">El borrador tiene errores: se muestra la plantilla activa.</p>}
 						<label className="check">
 							<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} /> Mostrar
 							zonas táctiles
 						</label>
+						{shown.animation && (
+							<label className="check">
+								<input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} /> Reproducir
+								animación
+							</label>
+						)}
 					</div>
 					<div className="stack">
 						<div className="row">
@@ -147,7 +167,11 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 							<button type="button" onClick={() => setText(fmt(statusTemplate))}>
 								Cargar ejemplo de estado
 							</button>
+							<button type="button" onClick={() => setText(fmt(showcaseTemplate))}>
+								Cargar ejemplo avanzado
+							</button>
 						</div>
+						<ImportImage text={text} setText={setText} />
 						<label>
 							Plantilla (JSON)
 							<textarea
@@ -180,6 +204,7 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 				</div>
 			</section>
 
+			<ParamsForm key={`${d.template.id}@${d.template.version}`} id={id} template={d.template} values={d.values} />
 			<DataEditor id={id} values={d.values} />
 			<Commands id={id} />
 			<Events id={id} />
@@ -187,6 +212,192 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 		</>
 	)
 }
+
+// Fotograma de la animación según el tiempo desde que empezó a reproducirse; sin animación, el 0
+function useFrame(animation: DisplayTemplate['animation']) {
+	const [frame, setFrame] = useState(0)
+	useEffect(() => {
+		if (!animation) return
+		const start = performance.now()
+		const timer = setInterval(() => setFrame(currentFrame(animation, performance.now() - start)), 50)
+		return () => {
+			clearInterval(timer)
+			setFrame(0)
+		}
+	}, [animation])
+	return animation ? frame : 0
+}
+
+// Archivo de imagen → canvas al tamaño elegido → RGB565 (la codificación más corta) → elemento image al final del borrador
+function ImportImage({ text, setText }: { text: string; setText: (t: string) => void }) {
+	const [size, setSize] = useState({ w: '', h: '' })
+	const [error, setError] = useState<string | null>(null)
+	const file = useRef<HTMLInputElement>(null)
+
+	async function importFile(f: File) {
+		setError(null)
+		let t: { rotation?: number; elements?: unknown[] }
+		try {
+			t = JSON.parse(text)
+			if (typeof t !== 'object' || t === null || Array.isArray(t)) throw new Error()
+		} catch {
+			return setError('El borrador no es una plantilla JSON válida: corrígelo antes de importar la imagen.')
+		}
+		const canvas = displaySize(t.rotation)
+		// vacío = el lienzo entero según la rotación del borrador
+		const dim = (v: string, max: number) => Math.min(Math.max(Math.round(Number(v)) || max, 1), max)
+		const w = dim(size.w, canvas.width)
+		const h = dim(size.h, canvas.height)
+		try {
+			const bitmap = await createImageBitmap(f)
+			const c = document.createElement('canvas')
+			c.width = w
+			c.height = h
+			const ctx = c.getContext('2d')
+			if (!ctx) throw new Error('sin canvas 2d')
+			ctx.drawImage(bitmap, 0, 0, w, h)
+			const image = encodeImage(ctx.getImageData(0, 0, w, h).data, w, h)
+			setText(fmt({ ...t, elements: [...(t.elements ?? []), { type: 'image', x: 0, y: 0, w, h, ...image }] }))
+		} catch (e) {
+			setError(`No se pudo leer la imagen: ${(e as Error).message}`)
+		} finally {
+			if (file.current) file.current.value = '' // permite volver a importar el mismo archivo
+		}
+	}
+
+	return (
+		<fieldset className="stack">
+			<legend>Importar imagen</legend>
+			<div className="row">
+				<label>
+					Ancho (px)
+					<input
+						type="number"
+						min={1}
+						max={320}
+						value={size.w}
+						placeholder="lienzo"
+						onChange={(e) => setSize({ ...size, w: e.target.value })}
+					/>
+				</label>
+				<label>
+					Alto (px)
+					<input
+						type="number"
+						min={1}
+						max={320}
+						value={size.h}
+						placeholder="lienzo"
+						onChange={(e) => setSize({ ...size, h: e.target.value })}
+					/>
+				</label>
+				<label className="grow">
+					Archivo
+					<input
+						ref={file}
+						type="file"
+						accept="image/*"
+						aria-describedby="import-hint"
+						onChange={(e) => {
+							const f = e.target.files?.[0]
+							if (f) void importFile(f)
+						}}
+					/>
+				</label>
+			</div>
+			<small id="import-hint">
+				Se escala al tamaño elegido (vacío = el lienzo entero), se pasa a RGB565 con la compresión más corta y se añade
+				como elemento image en x 0, y 0. Muévelo editando el JSON.
+			</small>
+			<Problems lines={error ? [error] : []} />
+		</fieldset>
+	)
+}
+
+// Formulario de los params de la plantilla activa: envía un PATCH /data solo con las claves cambiadas
+function ParamsForm({ id, template, values }: { id: string; template: DisplayTemplate; values: DisplayValues }) {
+	const qc = useQueryClient()
+	const [changed, setChanged] = useState<DisplayValues>({})
+	const send = useMutation({
+		mutationFn: (v: DisplayValues) => api.patchDisplayData(id, v),
+		onSuccess: () => {
+			setChanged({})
+			return qc.invalidateQueries({ queryKey: ['display', id] })
+		},
+	})
+	const params = Object.entries(template.params ?? {})
+	if (!params.length) return null
+
+	const current = withDefaults(template, values)
+	const value = (k: string) => (Object.hasOwn(changed, k) ? changed[k] : current[k])
+	const set = (k: string, v: DisplayValues[string]) => setChanged({ ...changed, [k]: v })
+	const issues = checkParams(template.params, changed).map((i) => i.message)
+	const dirty = Object.keys(changed).length > 0
+
+	return (
+		<section>
+			<h2>Parámetros</h2>
+			<form
+				className="stack"
+				onSubmit={(e) => {
+					e.preventDefault()
+					if (dirty && !issues.length) send.mutate(changed)
+				}}
+			>
+				<p className="muted">
+					Los declara la plantilla activa ({template.id} v{template.version}) en <code>params</code>. Sin valor
+					guardado, se muestra su valor por defecto.
+				</p>
+				{params.map(([k, p]) => {
+					const name = p.description ? `${k}: ${p.description}` : k
+					if (p.type === 'boolean')
+						return (
+							<label key={k} className="check">
+								<input type="checkbox" checked={truthy(value(k))} onChange={(e) => set(k, e.target.checked)} /> {name}
+							</label>
+						)
+					return (
+						<label key={k}>
+							{name}
+							{p.type === 'number' ? (
+								<input
+									type="number"
+									step="any"
+									min={p.min}
+									max={p.max}
+									value={String(value(k) ?? '')}
+									onChange={(e) => set(k, e.target.value === '' ? null : Number(e.target.value))}
+								/>
+							) : (
+								<input
+									type="text"
+									maxLength={140}
+									value={String(value(k) ?? '')}
+									onChange={(e) => set(k, e.target.value)}
+								/>
+							)}
+						</label>
+					)
+				})}
+				<Problems lines={issues} />
+				<div className="row">
+					<button type="submit" disabled={!dirty || issues.length > 0 || send.isPending}>
+						Enviar parámetros
+					</button>
+					<span role="status">{send.isSuccess && 'Enviado.'}</span>
+				</div>
+				<Problems lines={api.errorLines(send.error, EXPLAIN)} />
+			</form>
+		</section>
+	)
+}
+
+const origin = (ev: DisplayEvent) =>
+	ev.source === 'button'
+		? `botón ${ev.button ?? '?'} ${ev.press === 'long' ? 'larga' : 'corta'}`
+		: ev.source === 'touch'
+			? 'toque'
+			: '—'
 
 function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 	const qc = useQueryClient()
@@ -296,6 +507,7 @@ function Events({ id }: { id: string }) {
 								<th scope="col">Hora</th>
 								<th scope="col">Acción</th>
 								<th scope="col">Evento</th>
+								<th scope="col">Origen</th>
 								<th scope="col">Estado</th>
 								<th scope="col">Toast</th>
 								<th scope="col">x,y</th>
@@ -309,6 +521,7 @@ function Events({ id }: { id: string }) {
 									</td>
 									<td>{ev.actionId}</td>
 									<td>{ev.name ?? '—'}</td>
+									<td>{origin(ev)}</td>
 									<td>{ev.status}</td>
 									<td>{ev.toast ?? '—'}</td>
 									<td>

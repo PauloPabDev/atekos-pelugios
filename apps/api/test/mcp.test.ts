@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { METADISPLAY_CONTRACT } from '@atekos/shared/contract'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { connect, registeredUser } from './oauth-helpers'
@@ -61,6 +62,7 @@ describe('mcp', () => {
 			'create_display',
 			'get_device',
 			'get_display',
+			'get_display_contract',
 			'list_devices',
 			'list_displays',
 			'set_device_state',
@@ -68,6 +70,16 @@ describe('mcp', () => {
 			'update_device_data',
 			'update_display_data',
 		])
+
+		// El contrato MetaDisplay, como herramienta y como recurso, con el origen de este despliegue.
+		const contract = (await call('get_display_contract')).body as { info: { version: string }; servers: object }
+		expect(contract.info.version).toBe(METADISPLAY_CONTRACT.version)
+		expect(contract.servers).toEqual({ atekos: expect.objectContaining({ host: new URL(s.url).host, protocol: 'ws' }) })
+		expect((await call('get_display_contract', { part: 'openapi' })).body.openapi).toBe('3.1.0')
+		const resources = (await client.listResources()).resources.map((r) => r.uri).sort()
+		expect(resources).toEqual(['atekos://contract/asyncapi.json', 'atekos://contract/openapi.json'])
+		const res = await client.readResource({ uri: 'atekos://contract/asyncapi.json' })
+		expect(JSON.parse((res.contents[0] as { text: string }).text).asyncapi).toBe('3.0.0')
 
 		const created = await call('create_device', { slug: 'luz-salon', name: 'Luz del salón', type: 'light' })
 		expect(created).toMatchObject({ isError: false, body: { slug: 'luz-salon', visibility: 'private', state: false } })

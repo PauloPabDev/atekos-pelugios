@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } fr
 import * as api from './api'
 import { Login, Register } from './pages/Auth'
 import { Authorize } from './pages/Authorize'
+import { Contract } from './pages/Contract'
 import { Devices } from './pages/Devices'
 import { DeviceDetail } from './pages/DeviceDetail'
 import { Displays } from './pages/Displays'
@@ -16,6 +17,7 @@ export function App() {
 			<Route path="/login" element={<Login />} />
 			<Route path="/register" element={<Register />} />
 			<Route path="/p/:id" element={<PublicDevice />} />
+			<Route path="/contrato" element={<Contract />} />
 			<Route element={<Session />}>
 				<Route index element={<Devices />} />
 				<Route path="/devices/:id" element={<DeviceDetail />} />
@@ -62,6 +64,7 @@ function Session() {
 					</NavLink>
 					<NavLink to="/displays">Pantallas</NavLink>
 					<NavLink to="/tokens">Tokens</NavLink>
+					<NavLink to="/contrato">Contrato</NavLink>
 				</nav>
 				<span className="muted">{me.data.username}</span>
 				<button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>

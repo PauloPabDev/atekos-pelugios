@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import type { Server } from 'node:http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayServerMessage } from '@atekos/shared'
+import { checkParams, DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayServerMessage } from '@atekos/shared'
 import type { Container } from '../container'
 import { AppError, Unauthorized } from '../shared/errors'
 import { activeTemplate } from '../modules/displays/application/access'
-import { publishAll, snapshotMessages } from '../modules/displays/application/messages'
+import { fragment, publishAll, snapshotMessages } from '../modules/displays/application/messages'
 import type { DisplayRecord } from '../modules/displays/domain/ports'
 import { onUpgrade } from './upgrade'
 
@@ -18,7 +18,7 @@ const DEDUP_TTL_SEC = 86_400
 // WSS del firmware MetaDisplay (DISENO §4 y §5). Aparte del /ws de la web; mismo patrón que attachWebSocket:
 // resuelve cuando Redis confirma el SUBSCRIBE de display-out.
 export async function attachDeviceWebSocket(server: Server, c: Container) {
-	const { repo, presence, outbox, eventLog } = c.displays
+	const { repo, presence, outbox, eventLog, maxMessageBytes } = c.displays
 	// ws cierra con 1009 cualquier trama de más de 8192 bytes.
 	const wss = new WebSocketServer({ noServer: true, maxPayload: DISPLAY_MAX_FRAME })
 	const sockets = new Map<string, Set<WebSocket>>() // displayId → sockets de esta instancia que ya hicieron hello
@@ -27,10 +27,11 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 		if (ws.readyState !== WebSocket.OPEN) return
 		const data = JSON.stringify(msg)
 		const bytes = Buffer.byteLength(data)
-		// El firmware descarta tramas mayores: no se envía y queda en el log.
-		if (bytes > DISPLAY_MAX_FRAME)
-			return c.logger.error({ type: msg.type, bytes }, 'mensaje a pantalla demasiado grande')
-		ws.send(data)
+		// La REST ya rechaza lo que no cabe (413): si aun así llega, no se envía y queda en el log.
+		if (bytes > maxMessageBytes) return c.logger.error({ type: msg.type, bytes }, 'mensaje a pantalla demasiado grande')
+		if (bytes <= DISPLAY_MAX_FRAME) return ws.send(data)
+		// El firmware no acepta tramas mayores: va en frag, seguidos en el mismo tick para que nada se intercale.
+		for (const frame of fragment(data)) ws.send(frame)
 	}
 
 	// Solo el header Bearer (CONTRATO §2): ni ?token= ni cookie.
@@ -111,7 +112,7 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 				case 'touch.tap':
 					if (!sameDevice(m.deviceId)) return ws.close(1008, 'deviceId no coincide')
 					return touch(m)
-				default: // template.ack, data.ack, trust.ack, ota.ack: solo se registran
+				default: // template.ack, data.ack, frag.ack, trust.ack, ota.ack: solo se registran
 					return log[m.ok ? 'info' : 'warn']({ ack: m }, 'ack de pantalla')
 			}
 		}
@@ -162,6 +163,9 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 					templateVersion: m.templateVersion,
 					status: result.status,
 					toast: result.toast ?? null,
+					source: m.source ?? null,
+					button: m.button ?? null,
+					press: m.press ?? null,
 				})
 				.catch((err) => log.error({ err, eventId: m.eventId }, 'no se pudo guardar el toque'))
 		}
@@ -201,6 +205,19 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 			if (event === 'data.refresh') {
 				send(ws, snapshotMessages(display, t)[1]) // solo a este socket
 				return result('ok', 'Datos actualizados')
+			}
+			// La información concreta de la acción pasa a los valores, como un PATCH /data (mismas validaciones).
+			if (event === 'data.set' && action.payload) {
+				const values = action.payload
+				if (checkParams(t.params, values).length) return result('error', 'Datos invalidos')
+				try {
+					await repo.mergeValues(d.id, values)
+				} catch (err) {
+					if (err instanceof AppError) return result('error', 'Datos invalidos') // p. ej. más de 64 claves
+					throw err
+				}
+				await outbox.publish(d.id, { type: 'data.update', templateVersion: t.version, strategy: 'patch', values })
+				return { ...result('ok', 'Datos cambiados'), patch: values }
 			}
 			return result('ok', 'Accion recibida')
 		}

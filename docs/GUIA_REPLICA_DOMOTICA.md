@@ -276,6 +276,7 @@ Base `/api/v1`. Los cuerpos son JSON validados con los esquemas de `packages/sha
 | `POST` | `/devices/:id/telemetry` | dueño · `telemetry:write` | `{ values: {...}, ts? }`, con rate limit por token. |
 | `GET` | `/devices/:id/telemetry?from&to&limit` | lector | Lecturas en un rango. |
 | `GET` | `/health` | público | Hace ping a PG, Mongo y Redis; responde 200 o 503. Lo usa el healthcheck de Docker. |
+| `GET` | `/contract/{asyncapi,openapi}.json` | público | Contrato MetaDisplay generado desde los esquemas zod, con el origen de `PUBLIC_URL` ([`metadisplay/README.md`](metadisplay/README.md)). |
 
 ### Equivalencias con el sistema actual
 
@@ -778,6 +779,8 @@ TOKEN_PEPPER=cambia-esto-por-al-menos-32-caracteres-aleatorios
 # localhost en dev; tu dominio en prod (Caddy saca el certificado solo)
 DOMAIN=localhost
 ```
+
+> El `.env.example` real añade `PUBLIC_URL`, que activa el MCP ([`MCP.md`](MCP.md)), y `DISPLAY_MAX_TEMPLATE_BYTES`, el tope de las plantillas MetaDisplay (1 MB por defecto; [`metadisplay/PLANTILLAS.md`](metadisplay/PLANTILLAS.md) §9).
 
 ### 10.2 `apps/api/Dockerfile`
 

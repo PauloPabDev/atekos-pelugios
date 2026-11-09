@@ -5,7 +5,7 @@ import { findAdmin, toDetail, type DisplayDeps } from './access'
 import { assertFits, publishAll, snapshotMessages } from './messages'
 
 export class PutTemplateById {
-	constructor(private readonly deps: Pick<DisplayDeps, 'repo' | 'presence' | 'outbox'>) {}
+	constructor(private readonly deps: Pick<DisplayDeps, 'repo' | 'presence' | 'outbox' | 'maxMessageBytes'>) {}
 
 	// Guarda sin activar: sirve para las pantallas destino de `screen.*`. Si es la activa, el dispositivo la recibe ya.
 	async execute(actor: Actor, hardwareId: string, templateId: string, t: DisplayTemplate) {
@@ -13,7 +13,7 @@ export class PutTemplateById {
 			throw Unprocessable('invalid_template', 'El id de la plantilla no coincide con el de la ruta')
 		const d = await findAdmin(this.deps.repo, actor, hardwareId)
 		const messages = snapshotMessages(d, t)
-		assertFits(messages) // también si no es la activa: algún día lo será
+		assertFits(messages, this.deps.maxMessageBytes) // también si no es la activa: algún día lo será
 		await this.deps.repo.upsertTemplate(d.id, t)
 		if (d.activeTemplateId === t.id) await publishAll(this.deps.outbox, d.id, messages)
 		return toDetail(this.deps, d) // guardar sin activar no cambia la fila de la pantalla

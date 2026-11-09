@@ -15,6 +15,7 @@ import { displayRoutes } from './modules/displays/infrastructure/http-routes'
 import { oauthConsentRoutes, oauthServerRoutes } from './modules/oauth/infrastructure/http-routes'
 import { MCP_PATH } from './modules/oauth/application/provider'
 import { mcpRoutes } from './mcp/http-routes'
+import { CONTRACT_FILES, contractJson, type ContractFile } from './contract'
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -40,6 +41,8 @@ export function buildApp(c: Container) {
 		if (WRITE_METHODS.has(req.method) && hasBody && !req.is('application/json')) throw UnsupportedMediaType()
 		next()
 	})
+	// Las plantillas pueden llevar imágenes: /displays acepta hasta el tope configurable; el resto, 32kb.
+	app.use('/api/v1/displays', express.json({ limit: c.env.DISPLAY_MAX_TEMPLATE_BYTES }))
 	app.use(express.json({ limit: '32kb' }))
 	if (c.oauth) app.use(MCP_PATH, mcpRoutes(c, c.oauth))
 
@@ -54,6 +57,20 @@ export function buildApp(c: Container) {
 		const failed = Object.keys(checks).filter((_, i) => results[i]?.status === 'rejected')
 		if (failed.length) return res.status(503).json({ status: 'error', failed })
 		res.json({ status: 'ok' })
+	})
+	// Contrato MetaDisplay, público: lo leen el firmware, la página /contrato y el MCP (docs/metadisplay/README.md).
+	api.get('/contract/:file', (req, res) => {
+		const file = req.params.file as ContractFile
+		if (!CONTRACT_FILES.includes(file)) throw NotFound('Contrato')
+		res
+			.type('json')
+			.send(
+				contractJson(
+					file,
+					c.env.PUBLIC_URL ?? `${req.protocol}://${req.get('host')}`,
+					c.env.DISPLAY_MAX_TEMPLATE_BYTES,
+				),
+			)
 	})
 	// Después de /health: el healthcheck no depende de Redis para resolver el actor.
 	api.use(authenticate(c))
@@ -87,8 +104,11 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
 		return res.status(err.status).json({ error: err.code, message: err.message, issues: err.issues })
 	if (err instanceof ZodError) return res.status(400).json({ error: 'validation', issues: err.issues })
 	// body-parser lanza http-errors 4xx con `expose` (JSON mal formado, cuerpo > 32kb): son culpa del cliente, no 500.
-	if (err instanceof Error && 'expose' in err && err.expose && 'status' in err && typeof err.status === 'number')
-		return res.status(err.status).json({ error: 'invalid_body', message: err.message })
+	if (err instanceof Error && 'expose' in err && err.expose && 'status' in err && typeof err.status === 'number') {
+		// Mismo código que una plantilla que no cabe (DISENO §3), para que la web lo explique igual.
+		const tooLarge = 'type' in err && err.type === 'entity.too.large'
+		return res.status(err.status).json({ error: tooLarge ? 'message_too_large' : 'invalid_body', message: err.message })
+	}
 	req.log.error({ err }, 'error no controlado')
 	res.status(500).json({ error: 'internal', message: 'Error interno' })
 }

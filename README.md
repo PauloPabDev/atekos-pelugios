@@ -56,6 +56,10 @@ claude mcp add --transport http --scope user atekos https://atekos.toxolinko.sit
 
 Funcionamiento, herramientas, permisos y seguridad: [`docs/MCP.md`](docs/MCP.md).
 
+## Contrato de las pantallas
+
+El contrato MetaDisplay (WSS `/ws/device` y REST `/api/v1/displays`) se genera de los esquemas zod de `packages/shared`. Se publica en la página [`/contrato`](https://atekos.toxolinko.site/contrato) (versión y última actualización), en `/api/v1/contract/{asyncapi,openapi}.json` y en el MCP. Cómo añadir una feature a partir del contrato: [`docs/metadisplay/README.md`](docs/metadisplay/README.md). Después de cambiar los esquemas, se ejecuta `pnpm contract`.
+
 ## Firmware
 
 El contrato para el ESP8266 (token ligado al dispositivo, polling o WebSocket) está en la [§13 de la guía](docs/GUIA_REPLICA_DOMOTICA.md#13-contrato-para-el-firmware-esp8266).

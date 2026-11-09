@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DISPLAY_MAX_FRAME, DISPLAY_MAX_TEMPLATE_BYTES } from '@atekos/shared'
 
 const Env = z.object({
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -17,6 +18,11 @@ const Env = z.object({
 			.url({ protocol: /^https?$/ })
 			.transform((u) => u.replace(/\/+$/, ''))
 			.optional(),
+	),
+	// Tope en bytes de una plantilla (cuerpo REST y mensaje a la pantalla, que viaja troceado en frag). '' = por defecto.
+	DISPLAY_MAX_TEMPLATE_BYTES: z.preprocess(
+		(v) => (v === '' ? undefined : v),
+		z.coerce.number().int().min(DISPLAY_MAX_FRAME).default(DISPLAY_MAX_TEMPLATE_BYTES),
 	),
 })
 export type Env = z.infer<typeof Env>

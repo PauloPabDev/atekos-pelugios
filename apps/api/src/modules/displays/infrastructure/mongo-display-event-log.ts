@@ -28,6 +28,9 @@ export const makeMongoDisplayEventLog = (db: Db): DisplayEventLog => {
 				templateVersion: d.templateVersion,
 				status: d.status,
 				toast: d.toast,
+				source: d.source ?? null, // los documentos anteriores a la 1.1 no los tienen
+				button: d.button ?? null,
+				press: d.press ?? null,
 			}))
 		},
 		async appendCommand(e) {
