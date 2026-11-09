@@ -8,6 +8,7 @@ type Row = typeof displays.$inferSelect
 
 const toRecord = (r: Row): DisplayRecord => ({
 	...r,
+	lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
 	createdAt: r.createdAt.toISOString(),
 	updatedAt: r.updatedAt.toISOString(),
 })
@@ -137,6 +138,12 @@ export const makePgDisplayRepository = (db: NodePgDatabase): DisplayRepository =
 		// Sin fila: el merge pasaría de 64 claves (o la pantalla se borró justo ahora; el caso de uso ya comprobó que existía).
 		if (!row) throw Unprocessable('invalid_data', 'máximo 64 variables')
 		return toRecord(row)
+	},
+	async seen(id, info) {
+		await db
+			.update(displays)
+			.set(info ? { lastSeenAt: now, info } : { lastSeenAt: now })
+			.where(eq(displays.id, id))
 	},
 	delete(id) {
 		return db.transaction(async (tx) => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Server } from 'node:http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayServerMessage } from '@atekos/shared'
+import { DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayInfo, type DisplayServerMessage } from '@atekos/shared'
 import type { Container } from '../container'
 import { AppError, Unauthorized } from '../shared/errors'
 import { activeTemplate } from '../modules/displays/application/access'
@@ -10,10 +10,24 @@ import type { DisplayRecord } from '../modules/displays/domain/ports'
 import { onUpgrade } from './upgrade'
 
 type Hello = Extract<DisplayClientMessage, { type: 'device.hello' }>
+type Info = Extract<DisplayClientMessage, { type: 'device.info' }>
 type Touch = Extract<DisplayClientMessage, { type: 'touch.tap' }>
 type UiResult = Extract<DisplayServerMessage, { type: 'ui.result' }>
 
 const DEDUP_TTL_SEC = 86_400
+// Una placa que se apaga no cierra el TCP: se da por caída al segundo ping sin pong (≤ 2 latidos).
+const HEARTBEAT_MS = 10_000
+const SEEN_EVERY_MS = 60_000 // el último contacto en PG se apunta como mucho una vez por minuto mientras sigue viva
+
+// La ficha de la placa: lo del hello o device.info que no es del protocolo.
+const toInfo = ({ firmware, board, display, buttons, capabilities }: Hello | Info): DisplayInfo => ({
+	firmware,
+	board,
+	display,
+	buttons,
+	capabilities,
+	receivedAt: new Date().toISOString(),
+})
 
 // WSS del firmware MetaDisplay (DISENO §4 y §5). Aparte del /ws de la web; mismo patrón que attachWebSocket:
 // resuelve cuando Redis confirma el SUBSCRIBE de display-out.
@@ -64,17 +78,24 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 		let ready = false // hizo un hello válido: está en `sockets` y en la presencia
 		let alive = true
 		let queue = Promise.resolve()
+		let seenAt = 0
+		const seen = (info?: DisplayInfo) => {
+			seenAt = Date.now()
+			return repo.seen(d.id, info).catch((err) => log.error({ err }, 'no se pudo apuntar el último contacto'))
+		}
 
 		ws.on('error', (err) => log.warn({ err }, 'error en /ws/device')) // p. ej. trama > 8192: ws ya cierra con 1009
 		ws.on('pong', () => {
 			alive = true
-			if (ready) presence.renew(d.id, connId).catch((err) => log.error({ err }, 'no se pudo renovar la presencia'))
+			if (!ready) return
+			presence.renew(d.id, connId).catch((err) => log.error({ err }, 'no se pudo renovar la presencia'))
+			if (Date.now() - seenAt >= SEEN_EVERY_MS) void seen()
 		})
 		const heartbeat = setInterval(() => {
 			if (!alive) return ws.terminate()
 			alive = false
 			ws.ping()
-		}, 30_000)
+		}, HEARTBEAT_MS)
 
 		ws.on('message', (raw, isBinary) => {
 			if (isBinary) return ws.close(1003, 'solo texto')
@@ -95,6 +116,7 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 			mine?.delete(ws)
 			if (!mine?.size) sockets.delete(d.id)
 			presence.remove(d.id, connId).catch((err) => log.error({ err }, 'no se pudo quitar la presencia'))
+			void seen() // «última conexión» = cuando se fue
 		})
 
 		async function onMessage(json: unknown) {
@@ -112,6 +134,9 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 				case 'touch.tap':
 					if (!sameDevice(m.deviceId)) return ws.close(1008, 'deviceId no coincide')
 					return touch(m)
+				case 'device.info': // respuesta a display.info (o la placa avisa de un cambio)
+					if (!sameDevice(m.deviceId)) return ws.close(1008, 'deviceId no coincide')
+					return seen(toInfo(m))
 				default: // template.ack, data.ack, frag.ack, trust.ack, ota.ack: solo se registran
 					return log[m.ok ? 'info' : 'warn']({ ack: m }, 'ack de pantalla')
 			}
@@ -126,6 +151,7 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 				sockets.get(d.id)!.add(ws)
 				await presence.add(d.id, connId)
 			}
+			await seen(toInfo(m))
 			const display = await repo.findById(d.id) // fresca: la plantilla activa puede haber cambiado
 			if (!display) return ws.close(1008, 'pantalla borrada')
 			const t = await activeTemplate(repo, display)

@@ -14,7 +14,14 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js'
-import type { DisplayTemplate, DisplayValues, ScheduleAction, ScheduleResult, ScheduleWhen } from '@atekos/shared'
+import type {
+	DisplayInfo,
+	DisplayTemplate,
+	DisplayValues,
+	ScheduleAction,
+	ScheduleResult,
+	ScheduleWhen,
+} from '@atekos/shared'
 
 export const visibility = pgEnum('visibility', ['public', 'private'])
 export const deviceType = pgEnum('device_type', ['light', 'switch', 'sensor', 'generic'])
@@ -61,6 +68,8 @@ export const displays = pgTable('displays', {
 	name: text('name').notNull(),
 	activeTemplateId: text('active_template_id').notNull(),
 	values: jsonb('values').$type<DisplayValues>().notNull().default({}),
+	info: jsonb('info').$type<DisplayInfo>(), // la última ficha de la placa (hello o device.info)
+	lastSeenAt: timestamp('last_seen_at', { withTimezone: true }), // último contacto de la placa
 	createdAt: createdAt(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

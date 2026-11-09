@@ -18,6 +18,7 @@ export const toDisplay = (d: DisplayRecord, online: boolean): Display => ({
 	name: d.name,
 	activeTemplateId: d.activeTemplateId,
 	online,
+	lastSeenAt: d.lastSeenAt,
 	createdAt: d.createdAt,
 	updatedAt: d.updatedAt,
 })
@@ -30,6 +31,7 @@ export async function toDetail(deps: Pick<DisplayDeps, 'repo' | 'presence'>, d: 
 		template: templates.find((t) => t.id === d.activeTemplateId)!,
 		templates: templates.map(({ id, version }) => ({ id, version })),
 		values: d.values,
+		info: d.info,
 	}
 }
 

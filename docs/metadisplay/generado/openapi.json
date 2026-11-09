@@ -2,7 +2,7 @@
 	"openapi": "3.1.0",
 	"info": {
 		"title": "MetaDisplay en atekos-pelugios: API REST",
-		"version": "1.2.0",
+		"version": "1.3.0",
 		"description": "Administración de pantallas, plantillas y datos. El dispositivo no la usa: habla solo por WSS /ws/device (ver asyncapi.json). Errores: { error, message?, issues? }.",
 		"x-updated": "2026-11-09",
 		"x-max-message-bytes": 1048576
@@ -950,6 +950,12 @@
 					"online": {
 						"type": "boolean"
 					},
+					"lastSeenAt": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
 					"createdAt": {
 						"type": "string"
 					},
@@ -963,6 +969,7 @@
 					"name",
 					"activeTemplateId",
 					"online",
+					"lastSeenAt",
 					"createdAt",
 					"updatedAt"
 				]
@@ -986,6 +993,12 @@
 					},
 					"online": {
 						"type": "boolean"
+					},
+					"lastSeenAt": {
+						"type": [
+							"string",
+							"null"
+						]
 					},
 					"createdAt": {
 						"type": "string"
@@ -4141,6 +4154,118 @@
 								}
 							]
 						}
+					},
+					"info": {
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"firmware": {
+										"type": "string",
+										"maxLength": 64
+									},
+									"board": {
+										"type": "object",
+										"properties": {
+											"model": {
+												"type": "string",
+												"maxLength": 64
+											},
+											"chip": {
+												"type": "string",
+												"maxLength": 32
+											},
+											"mac": {
+												"type": "string",
+												"maxLength": 32
+											},
+											"flashBytes": {
+												"type": "integer",
+												"minimum": 0
+											},
+											"psramBytes": {
+												"type": "integer",
+												"minimum": 0
+											}
+										},
+										"additionalProperties": {}
+									},
+									"display": {
+										"type": "object",
+										"properties": {
+											"width": {
+												"type": "number"
+											},
+											"height": {
+												"type": "number"
+											},
+											"touch": {
+												"type": "boolean"
+											},
+											"buttons": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 16
+											},
+											"driver": {
+												"type": "string",
+												"maxLength": 32
+											}
+										},
+										"required": [
+											"width",
+											"height"
+										],
+										"additionalProperties": {}
+									},
+									"buttons": {
+										"maxItems": 16,
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"button": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 15
+												},
+												"name": {
+													"type": "string",
+													"maxLength": 24
+												},
+												"gpio": {
+													"type": "integer",
+													"minimum": 0,
+													"maximum": 64
+												}
+											},
+											"required": [
+												"button"
+											],
+											"additionalProperties": {}
+										}
+									},
+									"capabilities": {
+										"maxItems": 64,
+										"type": "array",
+										"items": {
+											"type": "string",
+											"maxLength": 32
+										}
+									},
+									"receivedAt": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"display",
+									"receivedAt"
+								]
+							},
+							{
+								"type": "null"
+							}
+						]
 					}
 				},
 				"required": [
@@ -4149,11 +4274,13 @@
 					"name",
 					"activeTemplateId",
 					"online",
+					"lastSeenAt",
 					"createdAt",
 					"updatedAt",
 					"template",
 					"templates",
-					"values"
+					"values",
+					"info"
 				]
 			},
 			"DisplayTemplate": {
@@ -7412,6 +7539,18 @@
 						"required": [
 							"type",
 							"percent"
+						]
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "display.info"
+							}
+						},
+						"required": [
+							"type"
 						]
 					}
 				]

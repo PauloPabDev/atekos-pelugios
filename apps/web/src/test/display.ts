@@ -22,11 +22,13 @@ export const detail: DisplayDetail = {
 	name: 'Meta',
 	activeTemplateId: 'inicio',
 	online: false,
+	lastSeenAt: null,
 	createdAt: now,
 	updatedAt: now,
 	template: inicio,
 	templates: [{ id: 'inicio', version: 1 }],
 	values: { mensaje: 'HOLA' },
+	info: null,
 }
 // Un toque aceptado de ahora mismo; cada test cambia lo que mira
 export const touch = (extra: Partial<DisplayEvent> = {}): DisplayEvent => ({

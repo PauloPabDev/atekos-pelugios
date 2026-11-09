@@ -254,6 +254,52 @@ describe('/ws/device hello', () => {
 	})
 })
 
+describe('/ws/device ficha de la placa', () => {
+	it('el hello guarda la ficha y el último contacto; display.info → device.info la renueva; al irse queda lastSeenAt', async () => {
+		const { agent, d, path, tok } = await setup()
+		const detail = async () => DisplayDetail.parse((await agent.get(api(path)).expect(200)).body)
+		expect(await detail()).toMatchObject({ info: null, lastSeenAt: null })
+
+		const dev = await device(tok.token)
+		const board = { model: 'Waveshare ESP32-C6-Touch-LCD-1.47', chip: 'ESP32-C6', flashBytes: 4_194_304 }
+		const buttons = [{ button: 0, name: 'BOOT', gpio: 9 }]
+		dev.send({ ...hello(d.deviceId), board, buttons })
+		await dev.take(2)
+		const first = await detail()
+		expect(first.info).toMatchObject({
+			firmware: '1.0.0-touch',
+			board,
+			display: { width: 172, height: 320, touch: true, color: 'RGB565' }, // display es loose: lo extra se guarda
+			buttons,
+			capabilities: expect.arrayContaining(['touch.tap']),
+		})
+		expect(first.info).not.toHaveProperty('template')
+		expect(first.lastSeenAt).not.toBeNull()
+
+		await agent
+			.post(api(`${path}/commands`))
+			.send({ type: 'display.info' })
+			.expect(202)
+		expect(await dev.take()).toEqual([{ type: 'display.info' }])
+		dev.send({ type: 'device.info', deviceId: d.deviceId, firmware: '1.3.0', display: { width: 172, height: 320 } })
+		await expect.poll(async () => (await detail()).info?.firmware).toBe('1.3.0')
+
+		dev.ws.close()
+		await expect.poll(async () => (await detail()).online).toBe(false)
+		const last = await detail()
+		expect(last.lastSeenAt! >= first.lastSeenAt!).toBe(true)
+		expect(last.updatedAt).toBe(first.updatedAt) // el contacto de la placa no es un cambio del dueño
+	})
+
+	it('un device.info de otro deviceId cierra con 1008', async () => {
+		const { d, tok } = await setup()
+		const dev = await device(tok.token)
+		await synced(dev, d.deviceId)
+		dev.send({ type: 'device.info', deviceId: 'md-000000000000', display: { width: 172, height: 320 } })
+		expect(await dev.closeCode()).toBe(1008)
+	})
+})
+
 describe('/ws/device mensajes grandes', () => {
 	it('una plantilla de más de 8192 bytes llega en frag seguidos que reensamblados dan su template.set; luego el snapshot', async () => {
 		const { agent, d, path, tok } = await setup()

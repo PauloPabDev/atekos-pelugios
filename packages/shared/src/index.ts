@@ -563,12 +563,60 @@ export const PatchDisplayInput = z
 	.partial()
 export type PatchDisplayInput = z.infer<typeof PatchDisplayInput>
 
+// Lo que la placa cuenta de sí misma en device.hello y device.info (1.3). `.loose()`: el firmware puede añadir más.
+const DisplayInfoFields = {
+	firmware: z.string().max(64).optional(),
+	board: z
+		.object({
+			model: z.string().max(64).optional(), // 'Waveshare ESP32-C6-Touch-LCD-1.47'
+			chip: z.string().max(32).optional(), // 'ESP32-C6'
+			mac: z.string().max(32).optional(),
+			flashBytes: z.number().int().min(0).optional(),
+			psramBytes: z.number().int().min(0).optional(),
+		})
+		.loose()
+		.optional(),
+	display: z
+		.object({
+			width: z.number(),
+			height: z.number(),
+			touch: z.boolean().optional(),
+			buttons: z.number().int().min(0).max(DISPLAY_BUTTONS).optional(), // cuántos botones físicos tiene
+			driver: z.string().max(32).optional(), // 'ST7789'
+		})
+		.loose(),
+	// Cada botón físico: su índice lógico (el `button` de las acciones), nombre y GPIO
+	buttons: z
+		.array(
+			z
+				.object({
+					button: z
+						.number()
+						.int()
+						.min(0)
+						.max(DISPLAY_BUTTONS - 1),
+					name: z.string().max(24).optional(),
+					gpio: z.number().int().min(0).max(64).optional(),
+				})
+				.loose(),
+		)
+		.max(DISPLAY_BUTTONS)
+		.optional(),
+	capabilities: z.array(z.string().max(32)).max(64).optional(),
+}
+
+// La última ficha que mandó la placa (hello o device.info) y cuándo llegó.
+export const DisplayInfo = z.object({ ...DisplayInfoFields, receivedAt: z.string() })
+export type DisplayInfo = z.infer<typeof DisplayInfo>
+
 export const Display = z.object({
 	id: z.uuid(), // el que piden CreateTokenInput.displayId y ApiToken.displayId
 	deviceId: z.string(),
 	name: z.string(),
 	activeTemplateId: z.string(),
 	online: z.boolean(),
+	// Último contacto de la placa (hello, latido o desconexión); null si nunca se conectó
+	lastSeenAt: z.string().nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 })
@@ -578,6 +626,7 @@ export const DisplayDetail = Display.extend({
 	template: DisplayTemplate,
 	templates: z.array(z.object({ id: z.string(), version: z.number().int() })),
 	values: DisplayValues,
+	info: DisplayInfo.nullable(),
 })
 export type DisplayDetail = z.infer<typeof DisplayDetail>
 
@@ -603,10 +652,11 @@ export const DisplayEvent = z.object({
 export type DisplayEvent = z.infer<typeof DisplayEvent>
 
 // Solo display.* por ahora: trust.* y ota.install quedan fuera hasta homologar el hardware (DISENO §1)
-export const DISPLAY_COMMANDS = ['display.refresh', 'display.brightness'] as const
+export const DISPLAY_COMMANDS = ['display.refresh', 'display.brightness', 'display.info'] as const
 const COMMANDS = [
 	z.object({ type: z.literal('display.refresh') }),
 	z.object({ type: z.literal('display.brightness'), percent: z.number().int().min(0).max(50) }),
+	z.object({ type: z.literal('display.info') }), // 1.3: la placa responde con device.info
 ] as const
 export const DisplayCommand = z.discriminatedUnion('type', COMMANDS)
 export type DisplayCommand = z.infer<typeof DisplayCommand>
@@ -618,18 +668,10 @@ export const DisplayClientMessage = z.discriminatedUnion('type', [
 		type: z.literal('device.hello'),
 		protocol: z.literal(1),
 		deviceId: z.string().max(64),
-		firmware: z.string().max(64).optional(),
-		display: z
-			.object({
-				width: z.number(),
-				height: z.number(),
-				touch: z.boolean().optional(),
-				buttons: z.number().int().min(0).max(DISPLAY_BUTTONS).optional(), // cuántos botones físicos tiene
-			})
-			.loose(),
+		...DisplayInfoFields,
 		template: z.object({ id: z.string().max(64), version: z.number().int() }).optional(),
-		capabilities: z.array(z.string().max(32)).max(64).optional(),
 	}),
+	z.object({ type: z.literal('device.info'), deviceId: z.string().max(64), ...DisplayInfoFields }),
 	z.object({
 		type: z.literal('template.ack'),
 		...AckBase,

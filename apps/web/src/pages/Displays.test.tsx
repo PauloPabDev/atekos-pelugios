@@ -11,6 +11,7 @@ const display: Display = {
 	name: 'Meta',
 	activeTemplateId: 'inicio',
 	online: true,
+	lastSeenAt: null,
 	createdAt: now,
 	updatedAt: now,
 }

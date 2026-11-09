@@ -126,6 +126,7 @@ test('/programas: agenda con el destino de cada ejecución y pausar al momento d
 		name: 'Pantalla cocina',
 		activeTemplateId: 'inicio',
 		online: true,
+		lastSeenAt: null,
 		createdAt: now,
 		updatedAt: now,
 	}
