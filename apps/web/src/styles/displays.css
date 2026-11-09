@@ -24,15 +24,9 @@
 	overflow-wrap: anywhere;
 }
 
-/* Se ve como lo guarda la API (hex en mayúsculas); el valor enviado no cambia */
+/* Sin uppercase visual: el prefijo «md-» va en minúsculas y verlo como «MD-» confunde */
 .device-id {
 	font-family: var(--mono);
-	text-transform: uppercase;
-}
-
-/* El ejemplo enseña el formato real, con «md-» en minúsculas */
-.device-id::placeholder {
-	text-transform: none;
 }
 
 /* ---------- Panel ---------- */
@@ -155,7 +149,8 @@
 	.preview-dock .preview svg {
 		/* En vw y no en %: el ancho del bisel depende del de la pantalla */
 		max-width: calc(100vw - 3.5rem - 2 * var(--bw));
-		max-height: 34svh;
+		/* Con barra superior, guardar y pestañas fijas, más alto deja el JSON en tres líneas */
+		max-height: 24svh;
 	}
 
 	.preview-dock .preview figcaption {
