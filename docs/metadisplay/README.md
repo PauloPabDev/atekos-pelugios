@@ -5,17 +5,17 @@
 **Los esquemas zod de [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts) son el contrato.** De ellos sale todo lo demás:
 
 - Los mensajes del dispositivo: `DisplayClientMessage` (pantalla → servidor) y `DisplayServerMessage` (servidor → pantalla).
-- La plantilla y los datos: `DisplayTemplate` y `DisplayValues`.
+- La plantilla y los datos: `DisplayTemplate` y `DisplayValues`. Desde la 1.1 incluyen rotación, formas, imágenes, animación, botones físicos y parámetros; cómo usarlos se explica en **[`PLANTILLAS.md`](PLANTILLAS.md)**, que también enseña a leer y enviar los parámetros.
 - Los comandos: `DisplayCommand`.
 - Los cuerpos de la REST: `CreateDisplayInput`, `PatchDisplayInput`, `Display`, `DisplayDetail` y `DisplayEvent`.
 
-Con esos mismos esquemas valida la API (REST, WSS `/ws/device` y MCP) y valida la web, así que el contrato publicado y lo que se ejecuta no pueden divergir.
+Con esos mismos esquemas valida la API (REST, WSS `/ws/device` y MCP) y valida la web, así que el contrato publicado y lo que se ejecuta no pueden divergir. La semántica de lo que se dibuja (`binds`, `when`, `format`, valores por defecto y animación) está en [`render.ts`](../../packages/shared/src/render.ts), y la de las imágenes, en [`image.ts`](../../packages/shared/src/image.ts). La vista previa de la web usa los dos.
 
 [`packages/shared/src/contract.ts`](../../packages/shared/src/contract.ts) monta con ellos dos documentos estándar, con versión y fecha (`METADISPLAY_CONTRACT`):
 
 | Documento | Para quién | Qué describe |
 |---|---|---|
-| **AsyncAPI 3.0** | quien programa el firmware | WSS `/ws/device`: autenticación, los 12 mensajes y sus campos y límites. |
+| **AsyncAPI 3.0** | quien programa el firmware | WSS `/ws/device`: autenticación, los 14 mensajes (con `frag` y `frag.ack`, propios de atekos) y sus campos y límites. |
 | **OpenAPI 3.1** | apps, paneles, scripts | REST `/api/v1/displays/…`: rutas, acceso, cuerpos y códigos de error. |
 
 ## Dónde se publica
@@ -33,7 +33,7 @@ Siempre es el de la versión desplegada:
 
 `apps/api/test/contract.test.ts` comprueba que el contrato de atekos cumple el oficial:
 
-- Cubre todos los tipos de mensaje oficiales, salvo `trust.stage`, `trust.activate` y `ota.install`, que no se envían hasta homologar el hardware.
+- Cubre todos los tipos de mensaje oficiales, salvo `trust.stage`, `trust.activate` y `ota.install`, que no se envían hasta homologar el hardware. Los únicos que añade son `frag` y `frag.ack`.
 - Acepta **todos los ejemplos JSON** del `CONTRATO.md` oficial.
 
 Las diferencias con el oficial están justificadas en [`DISENO.md`](DISENO.md), con la marca **≠**. Por ejemplo, la REST va en `/api/v1/displays/…` y no en `/api/v1/devices/…`.
@@ -54,6 +54,19 @@ Las diferencias con el oficial están justificadas en [`DISENO.md`](DISENO.md), 
 
 Al desplegar, `/contrato`, `/api/v1/contract/*.json` y el MCP muestran la versión nueva con su fecha.
 
+## Cambiar el tope de tamaño
+
+Una plantilla, o cualquier mensaje a la pantalla, puede ocupar hasta **1 MB**. Para cambiarlo:
+
+1. Pon la variable de entorno de la API **`DISPLAY_MAX_TEMPLATE_BYTES`**, en bytes: en `.env` en local, o en las variables de Coolify en producción.
+2. Reinicia la API.
+
+No hace falta tocar código ni subir la versión del contrato. El contrato servido muestra el tope vigente en `info["x-max-message-bytes"]`. En `generado/` aparece el valor por defecto, `DISPLAY_MAX_TEMPLATE_BYTES` de `packages/shared`.
+
+Antes de subirlo, mira la flash de la pantalla: [`PLANTILLAS.md`](PLANTILLAS.md) §9.
+
 ## Ejemplos
 
-[`examples/`](examples) tiene plantillas y datos válidos (`goal-template.json`, `status-template.json` y `goal-data.json`), que también se comprueban en los tests.
+[`examples/`](examples) tiene plantillas y datos válidos, que también se comprueban en los tests:
+- `goal-template.json`, `status-template.json` y `goal-data.json`, del demo.
+- `showcase-template.json` (1.1), con todo lo nuevo.

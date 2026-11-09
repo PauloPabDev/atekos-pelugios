@@ -780,6 +780,8 @@ TOKEN_PEPPER=cambia-esto-por-al-menos-32-caracteres-aleatorios
 DOMAIN=localhost
 ```
 
+> El `.env.example` real añade `PUBLIC_URL`, que activa el MCP ([`MCP.md`](MCP.md)), y `DISPLAY_MAX_TEMPLATE_BYTES`, el tope de las plantillas MetaDisplay (1 MB por defecto; [`metadisplay/PLANTILLAS.md`](metadisplay/PLANTILLAS.md) §9).
+
 ### 10.2 `apps/api/Dockerfile`
 
 ```dockerfile

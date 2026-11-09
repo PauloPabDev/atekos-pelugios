@@ -3,6 +3,7 @@
 > Lado **servidor** del protocolo MetaDisplay 1.0 ([`CONTRATO.md`](./CONTRATO.md), [`openapi.yaml`](./openapi.yaml), [`asyncapi.yaml`](./asyncapi.yaml)) integrado con los usuarios, tokens, PG, Mongo y Redis de atekos. El firmware ESP32-C6 queda fuera del repo.
 > Este documento **manda sobre el contrato** donde se aparta de él. Cada desviación está marcada con **≠**.
 > El contrato que implementa atekos se **genera de los esquemas zod** y se publica en `/contrato`, `/api/v1/contract/*.json` y el MCP: ver [`README.md`](./README.md).
+> Desde el contrato **1.1** la plantilla tiene rotación, más formas, imágenes, animación, botones físicos y parámetros. Cómo usarlos: [`PLANTILLAS.md`](./PLANTILLAS.md).
 
 ## 1. Decisiones
 
@@ -18,8 +19,16 @@
 | Versionado | Al guardar una plantilla con un `id` que ya existe, su `version` debe ser **mayor** que la guardada; si no, 409 `version_not_incremented`. El dispositivo cachea por `id`+`version`, así que sin esta regla un cambio podría no llegarle nunca. |
 | Toques | Hay **reglas declarativas** por `action.event` (§5). Dedupe por `eventId` en Redis, historial en Mongo. |
 | Comandos | **≠** Solo `display.refresh` y `display.brightness`. Los comandos `trust.stage`, `trust.activate` y `ota.install` dan **422 `command_not_allowed`** hasta que el hardware esté homologado. |
-| Web | Sección «Pantallas» con vista previa SVG 172×320, editores JSON, estado online, eventos y comandos. Los datos en vivo se obtienen por **polling** cada 3 s (`refetchInterval`). **≠** No se extiende el protocolo de `/ws` web. |
+| Web | Sección «Pantallas» con vista previa SVG (172×320 o 320×172, con animación), editores JSON, formulario de parámetros, importación de imágenes, estado online, eventos y comandos. Los datos en vivo se obtienen por **polling** cada 3 s (`refetchInterval`). **≠** No se extiende el protocolo de `/ws` web. |
 | Varias instancias | Presencia en Redis y canal pub/sub `display-out`: cualquier instancia puede publicar hacia los sockets que tiene otra. |
+| Rotación (1.1) | **≠** `template.rotation` 0/90/180/270: lienzo de 172×320 (vertical) o 320×172 (horizontal). Las coordenadas y los toques van en el sistema girado. Para cambiar de orientación se cambia de plantilla. |
+| Elementos (1.1) | **≠** Además de los oficiales: `circle`, `ellipse`, `polygon`, `arc`, `curve` (Bézier de 3 o 4 puntos) e `image`, y `stroke` (grosor) en las líneas y las formas. **≠** No hay tope de elementos ni de acciones (el oficial era 45 y 24): limita el tamaño en bytes. |
+| Imágenes (1.1) | **≠** Elemento `image` con píxeles RGB565 en base64, sin comprimir (`rgb565`) o en tramos RLE de 3 bytes (`rgb565-rle`). La API los decodifica al validar y exige exactamente w·h píxeles. Van dentro de la plantilla, así que se cachean con ella. |
+| Tamaño (1.1) | **≠** Una plantilla (y cualquier mensaje a la pantalla) puede ocupar hasta `DISPLAY_MAX_TEMPLATE_BYTES`, 1 MB por defecto, que se cambia con una variable de entorno. Más grande → 413. El parser JSON de `/displays` usa ese tope; el resto de la API sigue en 32 KB. |
+| Fragmentos (1.1) | **≠** Un mensaje de más de 8192 bytes viaja en mensajes `frag` seguidos (base64 de trozos de 6000 bytes del JSON) y la pantalla lo reensambla. Responde con `frag.ack`. Los dos son extensiones propias del protocolo oficial. |
+| Parámetros (1.1) | **≠** `template.params` es la firma de la plantilla (tipo, `default`, `min`/`max` y descripción). Cualquier propiedad se puede ligar a una variable (`binds`), los textos tienen `format` y hay reglas `when` (si variable op valor → `set`). Semántica de referencia: `packages/shared/src/render.ts`. La API valida los datos contra los `params` de la plantilla activa. |
+| Animación (1.1) | **≠** `template.animation`: fotogramas con `ms`, dibujados encima de `elements`, y `repeat` (0 = siempre). |
+| Botones físicos (1.1) | **≠** Acciones con `trigger: 'button'`, `button` 0..15 (índice lógico; el firmware sabe el GPIO), `press` short/long y zona resaltada opcional. Cualquier acción puede llevar un `payload`. El `touch.tap` dice `source`, `button` y `press`, y el historial lo guarda. |
 
 ## 2. Modelo de datos
 
@@ -83,7 +92,8 @@ Acceso **admin** = sesión del dueño, o token del dueño con `displays:write` (
 
 Errores dentro de `/displays`:
 - Una plantilla o unos valores que no cumplen el esquema → **422** (`invalid_template` / `invalid_data`, con `issues`), no el 400 genérico de zod.
-- Un mensaje resultante (`template.set` o `data.update`) de más de **8192 bytes** serializado → **413** `message_too_large`.
+- Un cuerpo o un mensaje resultante (`template.set` o `data.update`) de más de **`DISPLAY_MAX_TEMPLATE_BYTES`** (1 MB por defecto) → **413** `message_too_large`. **≠** El oficial ponía el tope en 8192: lo que pasa de ahí viaja troceado (§4).
+- Valores que no cumplen los `params` de la plantilla activa (tipo o `min`/`max`) → **422** `invalid_data`.
 
 `Display` = `{ deviceId, name, activeTemplateId, online, createdAt, updatedAt }`.
 
@@ -105,9 +115,14 @@ Errores dentro de `/displays`:
 
 **`device.hello`**: registra el socket (`Map<displayId, Set<ws>>` local + `dpres`). Si `hello.template.id/version` no coincide con la plantilla activa → envía `template.set`. Después **siempre** envía `data.update` `snapshot`, con `templateVersion` de la activa.
 
-**`template.ack` / `data.ack` / `trust.ack` / `ota.ack`**: se registran en el log, con `warn` si `ok:false`. No tienen más efectos.
+**`template.ack` / `data.ack` / `frag.ack` / `trust.ack` / `ota.ack`**: se registran en el log, con `warn` si `ok:false`. No tienen más efectos.
 
-**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}` y `display.brightness { percent }`. Todos tienen que caber en 8192 bytes. Los que van a todos los sockets de la pantalla (REST, comandos y navegación `screen.*`) pasan por `display-out`; las respuestas a un toque (`ui.result`, `event.ack` y el snapshot de `data.refresh`) van directas al socket que tocó.
+**Fragmentos (1.1)**:
+- Antes de enviar, si la trama serializada pasa de 8192 bytes, se trocea con `fragment()`: bytes UTF-8 en trozos de 6000, en base64, como `frag { id, seq, count, bytes, data }`.
+- Se envían seguidos en un mismo tick, así que nada se intercala.
+- Un mensaje mayor que el tope no se envía y queda en el log; no debería ocurrir, porque la REST ya lo rechaza con 413.
+
+**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}`, `display.brightness { percent }` y, para lo que no cabe en una trama, `frag` (1.1). Cada trama ocupa como mucho 8192 bytes: lo que pasa de ahí se trocea. Los que van a todos los sockets de la pantalla (REST, comandos y navegación `screen.*`) pasan por `display-out`; las respuestas a un toque (`ui.result`, `event.ack` y el snapshot de `data.refresh`) van directas al socket que tocó.
 
 ## 5. Toques (`touch.tap`) y reglas declarativas
 
@@ -120,31 +135,53 @@ Errores dentro de `/displays`:
 4. Regla según el `event` de la acción:
    - `screen.<templateId>`: si esa plantilla existe, la activa y publica `template.set` + snapshot a **todos** los sockets de la pantalla, con toast `Pantalla cambiada`. Si no existe → `status: 'error'` con toast `Pantalla no existe`.
    - `data.refresh`: reenvía el snapshot a ese socket, con toast `Datos actualizados`.
+   - `data.set` (1.1): fusiona el `payload` de la acción en los valores, como `PATCH /data`, y publica el `data.update` `patch` a **todos** los sockets. El toast es `Datos cambiados` y el `ui.result` lleva `patch`. Si el resultado pasa de 64 claves o no cumple los `params` → `status: 'error'` con toast `Datos invalidos`.
    - Cualquier otro: solo se registra, con toast `Accion recibida`.
 5. El `ui.result` final se guarda en `dedup:` (`EX 86400`) y se envía. Se añade el evento a Mongo `display_events` (si falla, solo se registra en el log).
 
-Los toasts van sin tildes porque la fuente del LCD es ASCII. Ningún toque cambia datos de negocio por sí solo (contrato §5).
+Los toasts van sin tildes porque la fuente del LCD es ASCII. Ningún toque cambia datos de negocio por sí solo (contrato §5): `data.set` solo cambia los valores que muestra la pantalla.
+
+Los botones físicos (1.1) llegan como un `touch.tap` más, con `source: 'button'`, `button` y `press`. Siguen las mismas reglas, y el historial guarda `source`/`button`/`press` (`null` en los eventos antiguos).
 
 ## 6. Esquemas compartidos (`@atekos/shared`)
 
 `DisplayHardwareId`, `DisplayElement`, `DisplayTouchAction`, `DisplayTemplate`, `DisplayValues`, `Display`, `DisplayDetail`, `DisplayEvent`, `DisplayCommand`, `CreateDisplayInput`, `PatchDisplayInput`, los mensajes del dispositivo (`DisplayClientMessage`: hello, template.ack, data.ack, touch.tap, trust.ack, ota.ack) y las constantes `DISPLAY_WIDTH`, `DISPLAY_HEIGHT` y `DISPLAY_MAX_FRAME`. Los scopes nuevos son `display:connect` y `displays:write`. `CreateTokenInput` y `ApiToken` ganan `displayId`.
 
-Las validaciones de la plantilla siguen la unión del openapi y el demo:
-- Coordenadas dentro de 172×320, con `x+w ≤ 172` e `y+h ≤ 320`.
-- `line` exige `x2`/`y2`.
-- `text`, `progress` y `button` exigen `value` o `bind`.
-- `size` de 1 a 4; colores `#RRGGBB`; `radius` de 0 a 10.
-- Hasta 45 elementos y 24 acciones, con ids de acción **únicos** (≤ 48 caracteres).
-- `local.message` ≤ 24.
-- Valores: claves ≤ 40 y ≤ 64 claves; los textos ≤ 140; los valores son string, number, boolean o null.
+Desde la 1.1 también: `DisplayParam`, `DisplayRule`, los helpers `displaySize`, `resolveElement`, `withDefaults`, `currentFrame` y `checkParams` (`render.ts`), y `encodeImage`/`decodeImage` (`image.ts`). La guía de uso está en [`PLANTILLAS.md`](./PLANTILLAS.md).
+
+Las validaciones de la plantilla siguen la unión del openapi y el demo, ampliada en la 1.1:
+- **Lienzo:**
+  - Todo dentro del lienzo de su `rotation` (172×320 o 320×172), con la caja de cada elemento: `x+w`, `x±r`, todos los `points`…
+  - Lo mismo para los fotogramas, las zonas de las acciones y cada variante `when.set`.
+- **Elementos:**
+  - `line` exige `x2`/`y2`.
+  - `text`, `progress` y `button` exigen `value`, `bind` o `format`.
+  - `size` de 1 a 4; colores `#RRGGBB`; `radius` de 0 a 10; `stroke` de 1 a 32.
+  - `polygon` de 2 a 64 puntos; `curve` de 3 a 4.
+  - `arc` con ángulos de −360 a 360.
+  - `image` con `data` en base64 que da exactamente w·h píxeles.
+- **Capa dinámica:**
+  - `binds` solo sobre propiedades del tipo (nunca `type`, `bind`, `points`, `encoding`, `data`, ni el `w`/`h` de una imagen).
+  - Cada `when.set` tiene que ser válido fusionado con el elemento.
+  - Como mucho 16 reglas por elemento.
+- **Acciones:**
+  - Sin tope de número, con ids **únicos** (≤ 48 caracteres).
+  - Un solo `button`+`press` por botón.
+  - Una zona de botón lleva `x,y,w,h` juntos.
+  - `local.message` ≤ 24; `payload` como los valores.
+- **`params` y animación:**
+  - ≤ 64 `params`, con `default` de su tipo y `min ≤ max`.
+  - Fotogramas de 20 a 60 000 ms.
+- **Valores:** claves ≤ 40 y ≤ 64 claves; los textos ≤ 140; los valores son string, number, boolean o null.
 
 ## 7. Ejemplos
 
-En `examples/` están los del demo. **≠** Para que naveguen con las reglas de §5, usa `event: 'screen.status.v1'`, `'screen.goal.v1'` y `'data.refresh'` en lugar de `screen.status`, `screen.goal` y `goal.refresh`.
+En `examples/` están los del demo, más `showcase-template.json` (1.1): horizontal, con todas las formas, una imagen, animación, `params`/`binds`/`when` y botones físicos. **≠** Para que naveguen con las reglas de §5, usa `event: 'screen.status.v1'`, `'screen.goal.v1'` y `'data.refresh'` en lugar de `screen.status`, `screen.goal` y `goal.refresh`.
 
 ## 8. Fuera de alcance
 
-- El firmware. El de `MetaDisplay-C6-Touch/firmware` **todavía no implementa `touch.tap`/`ui.result`**.
+- El firmware. El de `MetaDisplay-C6-Touch/firmware` (1.2.0) envía `touch.tap` con el botón BOOT, pero **no implementa nada de la 1.1**: rechaza esas plantillas con `template.ack ok:false` e ignora los `frag`. Qué tiene que hacer está en [`PLANTILLAS.md`](./PLANTILLAS.md) §10.
+- Comprobar las `capabilities` del hello antes de enviar una plantilla que el firmware no sabe dibujar.
 - OTA y rotación de CA.
 - Webhooks.
 - Eventos de pantallas por el `/ws` web.
