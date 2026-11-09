@@ -307,7 +307,7 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 **Otras formas de enviarlos:**
 
 - **Desde la web:** en el detalle de la pantalla, el editor JSON de «Datos», que muestra encima qué variables usa la plantilla activa.
-- **Desde una IA:** con las herramientas MCP `get_display` (lee la plantilla activa y los valores) y `update_display_data` (envía con merge), ver [`../MCP.md`](../MCP.md).
+- **Desde una IA:** con las herramientas MCP `get_display` (lee la plantilla activa, los valores y las variables que usa) y `update_display_data` (envía con merge, o sustituye todos con `replace: true`). La IA también diseña plantillas, sube imágenes y envía comandos; ver [`../MCP.md`](../MCP.md) y su guía, `get_display_guide`.
 - **Desde la propia pantalla:**
   - `local: set_value` cambia un valor solo en esa pantalla.
   - `event: "data.set"` con `payload` cambia los valores en el servidor y en todas las conexiones.
@@ -321,7 +321,7 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 - **Cambiar el tope:** variable de entorno **`DISPLAY_MAX_TEMPLATE_BYTES`** de la API, en bytes. En local va en `.env`; en producción, en las variables de entorno de Coolify. Después hay que reiniciar la API. El contrato publicado muestra el tope vigente en `info["x-max-message-bytes"]`.
 
   Antes de subirlo, ten en cuenta la flash de la pantalla. Su LittleFS tiene 1,875 MB, y el firmware guarda la plantilla más una copia temporal mientras la escribe. Una plantilla de más de ~900 KB puede no caber, y entonces la pantalla la rechaza con `template.ack ok:false`.
-- **El MCP** acepta cuerpos de hasta 32 KB. Las plantillas con imágenes grandes se envían por la REST.
+- **El MCP** acepta cuerpos con el mismo tope. Sus imágenes van por referencia (`upload_display_image` y `ref:…`, ver [`../MCP.md`](../MCP.md)), así que la IA no copia el base64.
 - **Fragmentación por el WSS:** el firmware solo acepta tramas de 8192 bytes. Un mensaje más grande lo envía el servidor como una serie de `frag`:
 
   ```json
