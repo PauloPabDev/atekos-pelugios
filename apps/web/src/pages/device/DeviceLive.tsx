@@ -12,6 +12,7 @@ import { ago, dayLabel, DEVICE_ICON, fullDate } from '../../labels'
 import { SCOPE_TEXT } from '../../scopes'
 import { EventRow, eventText, whoText } from './DeviceActivity'
 import { Segmented, stateLabel, useDevice } from './DeviceLayout'
+import { NextSchedules } from '../schedules/NextSchedules'
 
 const RECENT = 8
 const SHOWN_DATA = 8
@@ -152,9 +153,10 @@ export function DeviceLive() {
 							</p>
 						)}
 					</div>
-					{/* Próximos programas: hueco para la tarjeta del agente de programas, que integra el orquestador.
-					    Vacío no ocupa sitio (empty:hidden) y la tarjeta de encendido toma todo el ancho. */}
-					<div className="min-w-0 empty:hidden lg:flex-[2]" />
+					{/* Los sensores no se programan: sin tarjeta, la de encendido toma todo el ancho (empty:hidden) */}
+					<div className="min-w-0 empty:hidden lg:flex-[2]">
+						{d.type !== 'sensor' && <NextSchedules target={{ kind: 'device', id: d.id }} />}
+					</div>
 				</div>
 			</div>
 

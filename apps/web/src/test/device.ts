@@ -49,6 +49,7 @@ export function mockDevice(d: Device = luz, extra: Parameters<typeof mockFetch>[
 		[`GET ${api(d)}/events?limit=8`]: () => ({ body: [] }),
 		[`GET ${api(d)}/events?limit=200`]: () => ({ body: [] }),
 		[`GET ${api(d)}/telemetry?limit=1000`]: () => ({ body: [] }),
+		[`GET ${api(d)}/schedules`]: () => ({ body: [] }),
 		...extra,
 	})
 	vi.stubGlobal('fetch', (url: string, init?: RequestInit) => fn(url.replace(/from=[^&]*&/, ''), init))

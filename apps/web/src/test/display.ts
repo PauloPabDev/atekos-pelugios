@@ -54,6 +54,7 @@ export function mockDisplay(extra: Parameters<typeof mockFetch>[0] = {}) {
 		[`GET ${base}`]: () => ({ body: detail }),
 		[`GET ${base}/templates`]: () => ({ body: [inicio] }),
 		[`GET ${base}/events`]: () => ({ body: [] }),
+		[`GET ${base}/schedules`]: () => ({ body: [] }),
 		...extra,
 	})
 }
