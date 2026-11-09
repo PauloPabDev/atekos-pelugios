@@ -414,7 +414,7 @@ void drawImage(Arduino_GFX* g, File& raw, int x, int y, int w, int h, bool rle, 
 }
 ```
 
-`draw16bitRGBBitmap` recibe los colores como enteros: los bytes ya se han combinado arriba, así que no hay que intercambiarlos. La rotación la aplica Arduino_GFX. Para probar el formato, la web genera imágenes con «Importar imagen».
+`draw16bitRGBBitmap` recibe los colores como enteros: los bytes ya se han combinado arriba, así que no hay que intercambiarlos. La rotación la aplica Arduino_GFX. Para probar el formato, la web genera imágenes con el «Lienzo e imagen» del editor de plantillas.
 
 ## 9. Capa dinámica: las funciones sobre los datos
 
@@ -560,7 +560,7 @@ Las pruebas se hacen contra atekos, en local o en producción: se da de alta una
    - `{"alarma": true}` muestra el triángulo;
    - `{"angulo": 200}` alarga el arco.
 4. **Botón:** el BOOT corto muestra «Datos cambiados» y la web pasa a `estado: PULSADO` y `alarma: true`; el largo devuelve `OK`. En «Eventos», la columna «Origen» dice «botón 0 corto» o «botón 0 largo».
-5. **Imagen grande:** «Importar imagen» con una foto de 320×172 en una plantilla horizontal (unos 150 KB) llega en `frag` y se ve completa. Mira en el log del servidor que haya un `frag.ack ok:true`.
+5. **Imagen grande:** «Lienzo e imagen» con una foto de 320×172 («Pantalla completa», «Rellenar») en una plantilla horizontal (unos 150 KB) llega en `frag` y se ve completa. Mira en el log del servidor que haya un `frag.ack ok:true`.
 6. **Corte a medias:** apagar el WiFi durante la descarga. Al volver, la plantilla anterior sigue y la nueva se descarga entera.
 7. **Rotación:** la misma plantilla sencilla con `rotation` 0, 90, 180 y 270. Sin franjas de basura, el origen arriba a la izquierda y el toast y el punto de conexión dentro de la pantalla.
 8. **Memoria:** `ESP.getFreeHeap()` estable después de 20 cambios de plantilla y de 10 minutos de animación.
