@@ -1,8 +1,8 @@
 import { Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import * as api from '../api'
-import { Icon, type IconName } from '../components/Icon'
-import '../styles/contract.css'
+import { type IconName } from '../components/Icon'
+import { IconTile, Loading, PageHeader } from '../components/ui'
 
 // Solo lo que lee esta página de los documentos (JSON Schema dentro de AsyncAPI 3.0 y OpenAPI 3.1)
 type Schema = {
@@ -50,11 +50,19 @@ type OpenApi = {
 const METHODS = ['get', 'post', 'put', 'patch', 'delete']
 const REF = '#/components/schemas/'
 const MAX_DEPTH = 8
-// El color del chip dice el sentido: cian sale del dispositivo, violeta del servidor
+// La insignia repite el sentido en cada mensaje: índigo para lo que manda el servidor
 const GROUPS = [
-	['device', 'Del dispositivo al servidor', 'cyan'],
-	['server', 'Del servidor al dispositivo', 'violet'],
+	['device', 'Del dispositivo al servidor', 'Dispositivo → servidor', 'badge'],
+	['server', 'Del servidor al dispositivo', 'Servidor → dispositivo', 'badge badge-brand'],
 ] as const
+// Color sobrio por método, sobre el <code> entero («POST /ruta»): los tests lo buscan sin partir
+const METHOD_TONE: Record<string, string> = {
+	get: 'badge-success',
+	post: 'badge-brand',
+	put: 'badge-warning',
+	patch: 'badge-warning',
+	delete: 'badge-danger',
+}
 const OFFICIAL = 'https://github.com/PauloPabDev/atekos-pelugios/blob/main/docs/metadisplay/CONTRATO.md'
 const DOWNLOADS: [href: string, name: string, text: string, icon: IconName][] = [
 	['/api/v1/contract/asyncapi.json', 'asyncapi.json', 'WebSocket del dispositivo (AsyncAPI 3.0)', 'doc'],
@@ -111,10 +119,20 @@ function constraints(s: Schema): string[] {
 	return out
 }
 
+const openSchema = (name: string) => {
+	const d = document.getElementById(`schema-${name}`)
+	if (d instanceof HTMLDetailsElement) d.open = true
+}
+
 function TypeLabel({ s }: { s: Schema }) {
 	if (s.$ref?.startsWith(REF)) {
 		const name = s.$ref.slice(REF.length)
-		return <a href={`#schema-${name}`}>{name}</a>
+		// El esquema va plegado: se abre antes de saltar a él
+		return (
+			<a href={`#schema-${name}`} className="link" onClick={() => openSchema(name)}>
+				{name}
+			</a>
+		)
 	}
 	const v = variants(s)
 	if (v)
@@ -153,7 +171,7 @@ const variantName = (s: Schema, i: number) =>
 
 // Visor recursivo: tabla de campos; objetos anidados, items y variantes van plegados
 function SchemaView({ s, depth = 0 }: { s: Schema; depth?: number }) {
-	if (depth > MAX_DEPTH) return <p className="muted">…</p>
+	if (depth > MAX_DEPTH) return <p className="text-fg-muted">…</p>
 	const v = variants(s)
 	if (v?.some(complex))
 		return v.map((x, i) => (
@@ -165,12 +183,12 @@ function SchemaView({ s, depth = 0 }: { s: Schema; depth?: number }) {
 	if (s.items && complex(s.items)) return <SchemaView s={s.items} depth={depth + 1} />
 	if (!s.properties)
 		return (
-			<p>
-				<TypeLabel s={s} /> <span className="muted">{constraints(s).join(' · ')}</span>
+			<p className="text-sm">
+				<TypeLabel s={s} /> <span className="text-fg-muted">{constraints(s).join(' · ')}</span>
 			</p>
 		)
 	return (
-		<div className="table-wrap">
+		<div className="overflow-x-auto rounded-md border border-line">
 			<table>
 				<thead>
 					<tr>
@@ -185,13 +203,13 @@ function SchemaView({ s, depth = 0 }: { s: Schema; depth?: number }) {
 						<Fragment key={name}>
 							<tr>
 								<td>
-									<code>{name}</code>
+									<code className="font-medium whitespace-nowrap">{name}</code>
 								</td>
 								<td>
 									<TypeLabel s={p} />
 								</td>
 								<td>{s.required?.includes(name) ? 'sí' : 'no'}</td>
-								<td>{constraints(p).join(' · ')}</td>
+								<td className="min-w-48 text-fg-muted">{constraints(p).join(' · ')}</td>
 							</tr>
 							{complex(p) && (
 								<tr>
@@ -226,73 +244,82 @@ export function Contract() {
 	const o = openapi.data
 
 	return (
-		<div className="contract">
-			<h1>Contrato MetaDisplay</h1>
+		<>
+			<PageHeader
+				title="Contrato MetaDisplay"
+				description={
+					a && (
+						<>
+							<span className="badge badge-brand mr-2 align-middle">v{a.info.version}</span>
+							<span className="sr-only"> · </span>
+							Última actualización: <time dateTime={a.info['x-updated']}>{day(a.info['x-updated'])}</time> · Protocolo{' '}
+							{a.info['x-protocol']}
+						</>
+					)
+				}
+			/>
 			{error ? (
-				<p role="alert" className="error">
+				<p role="alert" className="alert alert-error">
 					No se pudo cargar el contrato: {error.message}
 				</p>
 			) : !a || !o ? (
-				<p className="loading">Cargando…</p>
+				<Loading />
 			) : (
 				<>
-					<p className="lead">
-						v{a.info.version} · Última actualización:{' '}
-						<time dateTime={a.info['x-updated']}>{day(a.info['x-updated'])}</time>
-					</p>
-					<nav aria-label="Secciones" className="sections">
+					<div className="card space-y-4 p-4 sm:p-5">
+						<p className="text-sm text-fg-muted">{a.info.description}</p>
+						<dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[9rem_1fr] sm:gap-y-3">
+							<dt className="text-fg-subtle">WebSocket</dt>
+							<dd className="mb-2 sm:mb-0">
+								<code className="mono break-all">{`${a.servers.atekos.protocol}://${a.servers.atekos.host}${a.servers.atekos.pathname}`}</code>
+							</dd>
+							<dt className="text-fg-subtle">Autenticación</dt>
+							<dd className="mb-2 sm:mb-0">{a.components.securitySchemes.deviceToken.description}</dd>
+							<dt className="text-fg-subtle">Trama máxima</dt>
+							<dd>{a.info['x-max-frame-bytes']} bytes</dd>
+						</dl>
+					</div>
+
+					<nav aria-label="Secciones" className="subnav mt-6">
 						<a href="#descargas">Descargas</a>
 						<a href="#mensajes">Mensajes</a>
 						<a href="#rest">API REST</a>
 						<a href="#esquemas">Esquemas</a>
 					</nav>
-					<div className="card">
-						<dl className="meta">
-							<dt>Protocolo</dt>
-							<dd>{a.info['x-protocol']}</dd>
-							<dt>WebSocket</dt>
-							<dd>
-								<code>{`${a.servers.atekos.protocol}://${a.servers.atekos.host}${a.servers.atekos.pathname}`}</code>
-							</dd>
-							<dt>Autenticación</dt>
-							<dd>{a.components.securitySchemes.deviceToken.description}</dd>
-							<dt>Trama máxima</dt>
-							<dd>{a.info['x-max-frame-bytes']} bytes</dd>
-						</dl>
-						<p>{a.info.description}</p>
-					</div>
 
-					<section id="descargas">
+					<section id="descargas" className="mt-8 scroll-mt-20 space-y-3">
 						<h2>Descargas</h2>
-						<ul className="cards">
+						<ul className="card divide-y divide-line overflow-hidden">
 							{DOWNLOADS.map(([href, name, text, icon]) => (
-								<li key={href} className="card row">
-									<span className="tile yellow">
-										<Icon name={icon} />
-									</span>
-									<div className="grow">
-										<a href={href} className="stretch card-title" download={href !== OFFICIAL}>
+								// El enlace cubre la fila entera para que el objetivo táctil sea grande
+								<li key={href} className="relative flex items-center gap-3 px-4 py-3 hover:bg-subtle">
+									<IconTile name={icon} />
+									<div className="min-w-0">
+										<a href={href} className="link after:absolute after:inset-0" download={href !== OFFICIAL}>
 											{name}
 										</a>
-										<p className="muted">{text}</p>
+										<p className="text-sm text-fg-muted">{text}</p>
 									</div>
 								</li>
 							))}
 						</ul>
 					</section>
 
-					<section id="mensajes">
+					<section id="mensajes" className="mt-10 scroll-mt-20 space-y-3">
 						<h2>Mensajes del WebSocket</h2>
-						{GROUPS.map(([from, label, color]) => (
+						{GROUPS.map(([from, label, sense, tone]) => (
 							<Fragment key={from}>
-								<h3>{label}</h3>
-								<ul className="cards list" aria-label={label}>
+								<h3 className="pt-2">{label}</h3>
+								<ul className="space-y-3" aria-label={label}>
 									{Object.values(a.components.messages)
 										.filter((m) => m['x-from'] === from)
 										.map((m) => (
-											<li key={m.name} className="card">
-												<code className={`chip mono ${color}`}>{m.name}</code>
-												{m.summary && <p>{m.summary}</p>}
+											<li key={m.name} className="card space-y-3 p-4">
+												<div className="flex flex-wrap items-center gap-2">
+													<code className="mono text-sm font-medium text-fg">{m.name}</code>
+													<span className={tone}>{sense}</span>
+												</div>
+												{m.summary && <p className="text-sm text-fg-muted">{m.summary}</p>}
 												<SchemaView s={m.payload} />
 											</li>
 										))}
@@ -301,12 +328,12 @@ export function Contract() {
 						))}
 					</section>
 
-					<section id="rest">
+					<section id="rest" className="mt-10 scroll-mt-20 space-y-3">
 						<h2>API REST</h2>
-						<p>
-							Base: <code>{o.servers[0]?.url}</code>
+						<p className="text-sm text-fg-muted">
+							Base: <code className="mono break-all">{o.servers[0]?.url}</code>
 						</p>
-						<div className="table-wrap">
+						<div className="card overflow-x-auto">
 							<table>
 								<thead>
 									<tr>
@@ -325,19 +352,20 @@ export function Contract() {
 											return (
 												op && (
 													<tr key={`${method} ${path}`}>
-														<td data-method={method}>
-															<code>
+														<td>
+															<code className={`badge font-mono ${METHOD_TONE[method]}`}>
 																{method.toUpperCase()} {path}
 															</code>
 														</td>
-														<td className="wrap">{op.summary}</td>
-														<td>{access(op.security ?? o.security)}</td>
+														<td className="min-w-56">{op.summary}</td>
+														<td className="whitespace-nowrap text-fg-muted">{access(op.security ?? o.security)}</td>
 														<td>{body ? <TypeLabel s={body} /> : '—'}</td>
-														<td className="wrap">
-															<ul className="events">
+														<td className="min-w-56">
+															<ul className="space-y-1">
 																{Object.entries(op.responses).map(([code, r]) => (
 																	<li key={code}>
-																		<code>{code}</code> {r.description}
+																		<code className="font-medium">{code}</code>{' '}
+																		<span className="text-fg-muted">{r.description}</span>
 																	</li>
 																))}
 															</ul>
@@ -352,19 +380,25 @@ export function Contract() {
 						</div>
 					</section>
 
-					<section id="esquemas">
+					<section id="esquemas" className="mt-10 scroll-mt-20 space-y-3">
 						<h2>Esquemas</h2>
-						{Object.entries(o.components.schemas).map(([name, s]) => (
-							<section key={name} id={`schema-${name}`}>
-								<h3>
-									<code>{name}</code>
-								</h3>
-								<SchemaView s={s} />
-							</section>
-						))}
+						<ul className="card divide-y divide-line">
+							{Object.entries(o.components.schemas).map(([name, s]) => (
+								<li key={name}>
+									<details id={`schema-${name}`} className="scroll-mt-20 px-4 py-1 open:pb-4">
+										<summary>
+											<code>{name}</code>
+										</summary>
+										<div className="mt-2">
+											<SchemaView s={s} />
+										</div>
+									</details>
+								</li>
+							))}
+						</ul>
 					</section>
 				</>
 			)}
-		</div>
+		</>
 	)
 }
