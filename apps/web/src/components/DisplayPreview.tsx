@@ -184,7 +184,7 @@ export function DisplayPreview({
 	const v = withDefaults(template, values)
 	const elements = [...template.elements, ...(template.animation?.frames[frame]?.elements ?? [])]
 	return (
-		<figure className="preview">
+		<figure>
 			<svg
 				viewBox={`0 0 ${width} ${height}`}
 				width={width * 2}
@@ -228,7 +228,8 @@ export function DisplayPreview({
 					</g>
 				)}
 			</svg>
-			<figcaption className="muted">
+			{/* Ancho 0 y mínimo 100%: el pie no ensancha el bisel, toma el ancho de la pantalla */}
+			<figcaption className="mt-1.5 w-0 min-w-full text-xs text-zinc-400 max-lg:truncate">
 				{template.id} v{template.version}. Vista previa aproximada: la fuente real del LCD es distinta.
 			</figcaption>
 		</figure>
