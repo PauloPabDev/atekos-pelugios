@@ -1,7 +1,16 @@
 import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { CreatedApiToken, Display, DisplayDetail, DisplayEvent, type DisplayTemplate, type Scope } from '@atekos/shared'
+import {
+	CreatedApiToken,
+	DISPLAY_MAX_FRAME,
+	Display,
+	DisplayDetail,
+	DisplayEvent,
+	encodeBase64,
+	type DisplayTemplate,
+	type Scope,
+} from '@atekos/shared'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
@@ -245,6 +254,41 @@ describe('/ws/device hello', () => {
 	})
 })
 
+describe('/ws/device mensajes grandes', () => {
+	it('una plantilla de más de 8192 bytes llega en frag seguidos que reensamblados dan su template.set; luego el snapshot', async () => {
+		const { agent, d, path, tok } = await setup()
+		const image = {
+			type: 'image',
+			x: 0,
+			y: 0,
+			w: 60,
+			h: 60,
+			encoding: 'rgb565',
+			data: encodeBase64(new Uint8Array(60 * 60 * 2)),
+		}
+		const big = { ...goal, id: 'grande', version: 1, elements: [...goal.elements, image] } as DisplayTemplate
+		await agent
+			.put(api(`${path}/template`))
+			.send(big)
+			.expect(200)
+		const dev = await device(tok.token)
+		dev.send(hello(d.deviceId))
+		const [first] = (await dev.take()) as [Msg & { count: number }]
+		expect(first).toMatchObject({ type: 'frag', seq: 0 })
+		const rest = await dev.take(first.count) // los demás trozos y el snapshot
+		const frags = [first, ...rest.slice(0, -1)] as (Msg & { id: string; seq: number; data: string })[]
+		expect(frags.map((f) => [f.type, f.id, f.seq])).toEqual(frags.map((_, i) => ['frag', first.id, i]))
+		for (const f of frags) expect(JSON.stringify(f).length).toBeLessThanOrEqual(DISPLAY_MAX_FRAME)
+		const json = Buffer.concat(frags.map((f) => Buffer.from(f.data, 'base64'))).toString()
+		expect(Buffer.byteLength(json)).toBe(first.bytes)
+		expect(JSON.parse(json)).toEqual({ type: 'template.set', template: big })
+		expect(rest.at(-1)).toEqual(snapshot({}))
+		dev.send({ type: 'frag.ack', id: first.id, ok: true }) // solo se registra
+		await dev.nothingMore()
+		dev.ws.close()
+	})
+})
+
 describe('/ws/device REST → dispositivo', () => {
 	it('PUT/PATCH /data, PUT /template y comandos llegan al dispositivo; sin conexión → 409', async () => {
 		const { agent, d, path, tok } = await setup()
@@ -397,6 +441,66 @@ describe('/ws/device toques', () => {
 		await b.nothingMore()
 		await expect.poll(async () => (await events(agent, path)).length).toBe(cases.length + 1)
 		expect(DisplayDetail.parse((await agent.get(api(path)).expect(200)).body).activeTemplateId).toBe(t.id)
+		a.ws.close()
+		b.ws.close()
+	})
+
+	it('botón físico con data.set: patch a los dos sockets, ui.result Datos cambiados y el evento con source/button/press', async () => {
+		const { agent, d, path, tok } = await setup()
+		const button = (id: string, press: 'short' | 'long', payload: Record<string, unknown>) => ({
+			id,
+			trigger: 'button' as const,
+			button: 0,
+			press,
+			mode: 'remote' as const,
+			event: 'data.set',
+			payload,
+		})
+		const t = {
+			...goal,
+			id: 'botones',
+			version: 1,
+			params: { estado: { type: 'string' } },
+			actions: [
+				...goal.actions,
+				button('pulsar', 'long', { estado: 'PULSADO' }),
+				button('malo', 'short', { estado: 5 }),
+			],
+		} as DisplayTemplate
+		await agent
+			.put(api(`${path}/template`))
+			.send(t)
+			.expect(200)
+		const a = await device(tok.token)
+		const b = await device(tok.token)
+		await synced(a, d.deviceId, t, 1)
+		await synced(b, d.deviceId, t, 1)
+
+		const press = { ...tap(d.deviceId, 'pulsar', t), source: 'button', button: 0, press: 'long', x: 0, y: 0 }
+		a.send(press)
+		const patch = { type: 'data.update', templateVersion: 1, strategy: 'patch', values: { estado: 'PULSADO' } }
+		// El patch va por display-out y el ui.result directo: entre ellos el orden puede variar.
+		const got = await a.take(2)
+		expect(got).toContainEqual(patch)
+		expect(got).toContainEqual({ ...uiResult(press.eventId, 'ok', 'Datos cambiados'), patch: { estado: 'PULSADO' } })
+		expect(await b.take()).toEqual([patch])
+
+		// Un payload que no cumple los params no se guarda.
+		const bad = { ...tap(d.deviceId, 'malo', t), source: 'button', button: 0, press: 'short' }
+		a.send(bad)
+		expect(await a.take()).toEqual([uiResult(bad.eventId, 'error', 'Datos invalidos')])
+		await b.nothingMore()
+
+		expect(DisplayDetail.parse((await agent.get(api(path)).expect(200)).body).values).toEqual({ estado: 'PULSADO' })
+		await expect.poll(async () => (await events(agent, path)).length).toBe(2)
+		expect((await events(agent, path)).at(-1)).toMatchObject({
+			actionId: 'pulsar',
+			status: 'ok',
+			toast: 'Datos cambiados',
+			source: 'button',
+			button: 0,
+			press: 'long',
+		})
 		a.ws.close()
 		b.ws.close()
 	})

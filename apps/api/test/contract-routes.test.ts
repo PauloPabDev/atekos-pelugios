@@ -1,3 +1,4 @@
+import { DISPLAY_MAX_TEMPLATE_BYTES } from '@atekos/shared'
 import request from 'supertest'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { startStack } from './stack'
@@ -15,6 +16,9 @@ it('GET /contract/*.json es público y usa el origen de este despliegue', async 
 	expect(async.body.servers.atekos).toMatchObject({ host: new URL(s.url).host, protocol: 'ws', pathname: '/ws/device' })
 	const open = await request(s.url).get('/api/v1/contract/openapi.json').expect(200)
 	expect(open.body.servers).toEqual([{ url: `${s.url}/api/v1` }])
+	// El tope que aplica esta API (DISPLAY_MAX_TEMPLATE_BYTES), no solo el de por defecto del paquete.
+	expect(async.body.info['x-max-message-bytes']).toBe(s.c.env.DISPLAY_MAX_TEMPLATE_BYTES)
+	expect(open.body.info['x-max-message-bytes']).toBe(DISPLAY_MAX_TEMPLATE_BYTES)
 	await request(s.url).get('/api/v1/contract/otra.json').expect(404)
 })
 

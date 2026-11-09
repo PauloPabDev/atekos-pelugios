@@ -18,7 +18,7 @@ import { AppError } from '../shared/errors'
 
 const INSTRUCTIONS = `Servidor de domótica atekos-pelugios. Gestiona los dispositivos y las pantallas MetaDisplay del usuario que autorizó la conexión.
 - Dispositivos: tienen un estado on/off (state) y un objeto data libre; update_device_data hace merge superficial sobre data.
-- Pantallas MetaDisplay: ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} px, identificadas por su deviceId «md-» + 12 hex. Flujo: create_display → set_display_template (guarda y activa la plantilla) → update_display_data (rellena las variables que la plantilla usa con bind).
+- Pantallas MetaDisplay: lienzo de ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} px en vertical o ${DISPLAY_HEIGHT}×${DISPLAY_WIDTH} con rotation 90/270, identificadas por su deviceId «md-» + 12 hex. Flujo: create_display → set_display_template (guarda y activa la plantilla; declara sus params) → update_display_data (rellena esos params, que la plantilla usa con bind, binds, format y when).
 - La pantalla física se conecta con un token display:connect que el usuario crea en la web (Tokens); este servidor no crea tokens ni borra nada.
 - El contrato oficial de las pantallas (mensajes del WSS /ws/device, plantillas, límites y la REST) está en get_display_contract y en los recursos atekos://contract/*: consúltalo antes de diseñar plantillas o features.
 - Los errores vuelven como resultado con isError y un JSON { error, message, issues }: corrige con los issues y reintenta.`
@@ -128,7 +128,15 @@ export function buildMcpServer(c: Container, actor: Extract<Actor, { kind: 'toke
 		'set_display_template',
 		{
 			title: 'Diseñar pantalla',
-			description: `Guarda una plantilla y la activa (si la pantalla está conectada, la recibe al momento). Lienzo de ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} px con origen arriba a la izquierda; ningún elemento puede salirse. Elementos: text, rect, line, progress (value 0–100) y button. text, progress y button llevan value fijo o bind a una variable que se rellena con update_display_data. Hasta 45 elementos y 24 acciones táctiles. Sube version al cambiar una plantilla con el mismo id.`,
+			description: [
+				'Guarda una plantilla y la activa (si la pantalla está conectada, la recibe al momento). Sube version al cambiar una plantilla con el mismo id.',
+				`Lienzo: rotation 0/180 = ${DISPLAY_WIDTH}×${DISPLAY_HEIGHT} px (vertical), 90/270 = ${DISPLAY_HEIGHT}×${DISPLAY_WIDTH} (horizontal); origen arriba a la izquierda y ningún elemento puede salirse.`,
+				'Elementos: text, rect, line, progress (value 0–100), button, circle {x,y,r}, ellipse {x,y,rx,ry}, polygon {points:[[x,y],…], closed}, arc {x,y,r,start,end en grados, 0 = las 3, horario}, curve {points: 3 = Bézier cuadrática, 4 = cúbica} e image {x,y,w,h, encoding rgb565|rgb565-rle, data base64}. stroke = grosor (1–32); colores #RRGGBB; filled/fillColor en las formas.',
+				'Parámetros: params declara las variables como la firma de una función ({ type: number|string|boolean, default, description, min, max }). text/progress/button llevan value, bind o format ("Temp: {temp} C"); binds liga cualquier propiedad a una variable ({ "x": "posX", "color": "estado" }); when = reglas en orden [{ key, op: eq|ne|gt|gte|lt|lte|truthy|falsy, value, set: {…} }]; visible:false oculta.',
+				'animation: { frames: [{ ms, elements }], repeat (0 = siempre) } se dibuja encima de elements.',
+				'actions: trigger tap (zona x,y,w,h) o button (botón físico 0..15, press short|long, zona opcional que se resalta), mode local|remote|hybrid, event screen.<templateId> | data.refresh | data.set (fusiona payload en los valores).',
+				'El MCP acepta cuerpos de 32 KB: las imágenes grandes van por la REST (PUT /api/v1/displays/{deviceId}/template).',
+			].join(' '),
 			inputSchema: { deviceId: HardwareId, template: DisplayTemplate },
 			annotations: { ...write, idempotentHint: true },
 		},
@@ -139,7 +147,7 @@ export function buildMcpServer(c: Container, actor: Extract<Actor, { kind: 'toke
 		{
 			title: 'Actualizar datos de la pantalla',
 			description:
-				'Merge de las variables de la pantalla (las que usan los bind de la plantilla). Valores: texto (≤ 140), número, booleano o null. Máximo 64 variables.',
+				'Merge de las variables de la pantalla (los params de la plantilla activa, que devuelve get_display). Valores: texto (≤ 140), número, booleano o null; máximo 64. Un valor que no cumple el tipo o el min/max de su param da error invalid_data.',
 			inputSchema: { deviceId: HardwareId, values: DisplayValues },
 			annotations: { ...write, idempotentHint: true },
 		},
@@ -157,7 +165,9 @@ export function buildMcpServer(c: Container, actor: Extract<Actor, { kind: 'toke
 			inputSchema: { part: z.enum(['asyncapi', 'openapi']).default('asyncapi') },
 			annotations: read,
 		},
-		({ part }) => ({ content: [{ type: 'text', text: contractJson(`${part}.json`, origin) }] }),
+		({ part }) => ({
+			content: [{ type: 'text', text: contractJson(`${part}.json`, origin, c.env.DISPLAY_MAX_TEMPLATE_BYTES) }],
+		}),
 	)
 	for (const file of CONTRACT_FILES)
 		server.registerResource(
@@ -168,7 +178,15 @@ export function buildMcpServer(c: Container, actor: Extract<Actor, { kind: 'toke
 				description: file.startsWith('async') ? 'Protocolo WSS /ws/device' : 'REST /api/v1/displays',
 				mimeType: 'application/json',
 			},
-			(uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: contractJson(file, origin) }] }),
+			(uri) => ({
+				contents: [
+					{
+						uri: uri.href,
+						mimeType: 'application/json',
+						text: contractJson(file, origin, c.env.DISPLAY_MAX_TEMPLATE_BYTES),
+					},
+				],
+			}),
 		)
 
 	return server

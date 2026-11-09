@@ -7,6 +7,7 @@ import type { Container } from '../src/container'
 // Sin Docker: solo lo que /health y el rate limit usan. El ping a Redis «cuelga» como cuando node-redis encola comandos mientras reconecta.
 const fake = {
 	logger: pino({ level: 'silent' }),
+	env: { DISPLAY_MAX_TEMPLATE_BYTES: 1_048_576 },
 	pool: { query: async () => ({}) },
 	mongo: { command: async () => Promise.reject(new Error('caído')) },
 	redis: { ping: () => new Promise(() => {}), incr: async () => 1, expire: async () => 1 },
