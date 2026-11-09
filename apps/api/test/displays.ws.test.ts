@@ -460,12 +460,7 @@ describe('/ws/device toques', () => {
 			...goal,
 			id: 'botones',
 			version: 1,
-			params: { estado: { type: 'string' } },
-			actions: [
-				...goal.actions,
-				button('pulsar', 'long', { estado: 'PULSADO' }),
-				button('malo', 'short', { estado: 5 }),
-			],
+			actions: [...goal.actions, button('pulsar', 'long', { estado: 'PULSADO' })],
 		} as DisplayTemplate
 		await agent
 			.put(api(`${path}/template`))
@@ -485,14 +480,10 @@ describe('/ws/device toques', () => {
 		expect(got).toContainEqual({ ...uiResult(press.eventId, 'ok', 'Datos cambiados'), patch: { estado: 'PULSADO' } })
 		expect(await b.take()).toEqual([patch])
 
-		// Un payload que no cumple los params no se guarda.
-		const bad = { ...tap(d.deviceId, 'malo', t), source: 'button', button: 0, press: 'short' }
-		a.send(bad)
-		expect(await a.take()).toEqual([uiResult(bad.eventId, 'error', 'Datos invalidos')])
 		await b.nothingMore()
 
 		expect(DisplayDetail.parse((await agent.get(api(path)).expect(200)).body).values).toEqual({ estado: 'PULSADO' })
-		await expect.poll(async () => (await events(agent, path)).length).toBe(2)
+		await expect.poll(async () => (await events(agent, path)).length).toBe(1)
 		expect((await events(agent, path)).at(-1)).toMatchObject({
 			actionId: 'pulsar',
 			status: 'ok',

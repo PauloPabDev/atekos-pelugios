@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Server } from 'node:http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { checkParams, DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayServerMessage } from '@atekos/shared'
+import { DISPLAY_MAX_FRAME, DisplayClientMessage, type DisplayServerMessage } from '@atekos/shared'
 import type { Container } from '../container'
 import { AppError, Unauthorized } from '../shared/errors'
 import { activeTemplate } from '../modules/displays/application/access'
@@ -209,7 +209,6 @@ export async function attachDeviceWebSocket(server: Server, c: Container) {
 			// La información concreta de la acción pasa a los valores, como un PATCH /data (mismas validaciones).
 			if (event === 'data.set' && action.payload) {
 				const values = action.payload
-				if (checkParams(t.params, values).length) return result('error', 'Datos invalidos')
 				try {
 					await repo.mergeValues(d.id, values)
 				} catch (err) {

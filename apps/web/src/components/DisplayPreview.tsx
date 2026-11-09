@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { decodeImage, displaySize, encodeBase64, resolveElement, rgb888, withDefaults } from '@atekos/shared'
+import { decodeImage, displaySize, encodeBase64, resolveElement, rgb888 } from '@atekos/shared'
 import type { DisplayTemplate, DisplayValues, ResolvedElement } from '@atekos/shared'
 
 const WHITE = '#FFFFFF'
@@ -181,7 +181,6 @@ export function DisplayPreview({
 	frame?: number
 }) {
 	const { width, height } = displaySize(template.rotation)
-	const v = withDefaults(template, values)
 	const elements = [...template.elements, ...(template.animation?.frames[frame]?.elements ?? [])]
 	return (
 		<figure>
@@ -196,7 +195,7 @@ export function DisplayPreview({
 			>
 				<rect width={width} height={height} fill={template.background ?? '#000000'} />
 				{elements.map((e, i) => {
-					const r = resolveElement(e, v)
+					const r = resolveElement(e, values)
 					return r && <Element key={i} e={r} />
 				})}
 				{showActions && (

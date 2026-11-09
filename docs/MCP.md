@@ -84,8 +84,8 @@ Todas devuelven el JSON del caso de uso en `content[0].text`. Un error del domin
 | `list_displays` | — | `Display[]` |
 | `get_display` | `{ deviceId }` (`md-` + 12 hex) | `DisplayDetail`: plantilla activa, plantillas y valores |
 | `create_display` | `{ deviceId, name }` | `Display`, con la plantilla `inicio` |
-| `set_display_template` | `{ deviceId, template }` (`DisplayTemplate`) | `DisplayDetail`. Guarda y activa la plantilla; si la pantalla está online, la recibe al momento. Admite todo lo de la 1.1: rotación, formas, `stroke`, imágenes, animación, `params`/`binds`/`format`/`when` y botones físicos ([`metadisplay/PLANTILLAS.md`](metadisplay/PLANTILLAS.md)). |
-| `update_display_data` | `{ deviceId, values }` (`DisplayValues`), con merge | `{ values }`. Si no cumple los `params` de la plantilla activa (que devuelve `get_display`), da error `invalid_data`. |
+| `set_display_template` | `{ deviceId, template }` (`DisplayTemplate`) | `DisplayDetail`. Guarda y activa la plantilla; si la pantalla está online, la recibe al momento. Admite todo lo de la 1.1: rotación, formas, `stroke`, imágenes, animación, variables con `bind`/`binds`/`format`/`when` y botones físicos ([`metadisplay/PLANTILLAS.md`](metadisplay/PLANTILLAS.md)). |
+| `update_display_data` | `{ deviceId, values }` (`DisplayValues`), con merge | `{ values }`. Son las variables que usa la plantilla activa (`get_display` la devuelve) y la única vía por la que les llegan valores. Un valor fuera de los límites, o más de 64 claves, da error `invalid_data`. |
 | `get_display_contract` | `{ part?: 'asyncapi' \| 'openapi' }` (por defecto `asyncapi`) | El contrato MetaDisplay vigente: `info.version` e `info["x-updated"]` dicen su versión y su última actualización ([`metadisplay/README.md`](metadisplay/README.md)). |
 
 Los esquemas de entrada son los de `packages/shared`, así que la IA recibe el mismo JSON Schema que valida la REST. El servidor manda además unas `instructions` breves: el lienzo de 172×320, el flujo de las pantallas, qué no puede hacer y que consulte el contrato antes de diseñar.
@@ -97,7 +97,7 @@ El contrato también está como **recursos MCP**, `atekos://contract/asyncapi.js
 1. `create_display { "deviceId": "md-34B7DA01ABCD", "name": "Salón" }`.
 2. `set_display_template` con una plantilla como [`status-template.json`](metadisplay/examples/status-template.json) o [`showcase-template.json`](metadisplay/examples/showcase-template.json).
    - El lienzo es de 172×320, o de 320×172 con `rotation` 90/270.
-   - La plantilla declara sus `params` y los elementos los usan con `bind`, `format`, `binds` o `when`.
+   - La plantilla no declara variables: los elementos las nombran con `bind`, `format`, `binds` o `when`, y sus valores llegan con `update_display_data`.
    - Para cambiar una plantilla que ya existe con el mismo `id`, sube `version`.
    - El MCP acepta cuerpos de hasta 32 KB: las plantillas con imágenes grandes se envían por la REST, con un tope de 1 MB.
 3. `update_display_data { "deviceId": "md-34B7DA01ABCD", "values": { "serverStatus": "OK", "daysText": "hace 2 min" } }`.

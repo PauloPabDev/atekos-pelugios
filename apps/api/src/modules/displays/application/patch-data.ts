@@ -1,5 +1,4 @@
-import { checkParams, type DisplayServerMessage, type DisplayValues } from '@atekos/shared'
-import { Unprocessable } from '../../../shared/errors'
+import { type DisplayServerMessage, type DisplayValues } from '@atekos/shared'
 import type { Actor } from '../../devices/domain/policy'
 import { activeTemplate, findAdmin, type DisplayDeps } from './access'
 import { assertFits, snapshotMessages } from './messages'
@@ -12,9 +11,6 @@ export class PatchData {
 		const { repo, outbox } = this.deps
 		const d = await findAdmin(repo, actor, hardwareId)
 		const t = await activeTemplate(repo, d)
-		// Solo las claves que declara la plantilla activa: los valores se comparten entre plantillas.
-		const issues = checkParams(t.params, patch)
-		if (issues.length) throw Unprocessable('invalid_data', 'Datos inválidos', issues)
 		const message: DisplayServerMessage = {
 			type: 'data.update',
 			templateVersion: t.version,

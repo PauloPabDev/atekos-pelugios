@@ -1,6 +1,6 @@
-import type { DisplayElement, DisplayParam, DisplayRule, DisplayTemplate, DisplayValues } from './index'
+import type { DisplayElement, DisplayRule, DisplayTemplate, DisplayValues } from './index'
 
-// Semántica de referencia de la capa dinámica de la plantilla (docs/metadisplay/PLANTILLAS.md §Parámetros).
+// Semántica de referencia de la capa dinámica de la plantilla (docs/metadisplay/PLANTILLAS.md §7).
 // La usan la vista previa de la web y la validación de la API; un firmware debe dibujar lo mismo.
 
 type Scalar = DisplayValues[string]
@@ -40,15 +40,24 @@ export function testRule(r: DisplayRule, values: DisplayValues): boolean {
 }
 
 // "Temp: {temp} C" → "Temp: 21.5 C". Una variable ausente o null se queda en ''.
+const SLOT = /\{([^{}]{1,40})\}/g
 export const formatText = (format: string, values: DisplayValues) =>
-	format.replace(/\{([^{}]{1,40})\}/g, (_, key: string) => (has(values, key) ? String(values[key] ?? '') : ''))
+	format.replace(SLOT, (_, key: string) => (has(values, key) ? String(values[key] ?? '') : ''))
 
-// Los `default` de `params` debajo de los valores recibidos.
-export function withDefaults(template: Pick<DisplayTemplate, 'params'>, values: DisplayValues): DisplayValues {
-	const defaults = Object.entries(template.params ?? {}).flatMap(([k, p]) =>
-		p.default === undefined ? [] : [[k, p.default]],
-	)
-	return { ...Object.fromEntries(defaults), ...values }
+// Variables de los datos que lee la plantilla (bind, binds, huecos de format y claves de when), sin repetir.
+export function templateVariables(t: Pick<DisplayTemplate, 'elements' | 'animation'>): string[] {
+	const keys = new Set<string>()
+	const slots = (f: unknown) => typeof f === 'string' && [...f.matchAll(SLOT)].forEach((m) => keys.add(m[1]!))
+	for (const e of [...t.elements, ...(t.animation?.frames.flatMap((f) => f.elements) ?? [])]) {
+		if ('bind' in e && typeof e.bind === 'string') keys.add(e.bind)
+		Object.values(e.binds ?? {}).forEach((k) => keys.add(k))
+		slots('format' in e && e.format)
+		for (const r of e.when ?? []) {
+			keys.add(r.key)
+			slots(r.set.format)
+		}
+	}
+	return [...keys]
 }
 
 // Orden: propiedades base → `bind` (atajo de binds.value) → `binds` → `when` en orden (cada regla que se cumple
@@ -84,19 +93,4 @@ export function currentFrame(animation: Animation, elapsedMs: number): number {
 		t -= f.ms
 	}
 	return animation.frames.length - 1
-}
-
-// Errores de unos valores frente a los `params` declarados (tipo y min/max). Las claves no declaradas y null valen:
-// los valores se comparten entre las plantillas de la pantalla.
-export function checkParams(params: Record<string, DisplayParam> | undefined, values: DisplayValues) {
-	const issues: { path: string[]; message: string }[] = []
-	for (const [key, p] of Object.entries(params ?? {})) {
-		if (!has(values, key) || values[key] === null) continue
-		const v = values[key]
-		const issue = (message: string) => issues.push({ path: [key], message })
-		if (typeof v !== p.type) issue(`${key} debe ser ${p.type}`)
-		else if (typeof v === 'number' && p.min !== undefined && v < p.min) issue(`${key} debe ser ≥ ${p.min}`)
-		else if (typeof v === 'number' && p.max !== undefined && v > p.max) issue(`${key} debe ser ≤ ${p.max}`)
-	}
-	return issues
 }

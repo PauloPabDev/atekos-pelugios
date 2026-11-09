@@ -336,36 +336,6 @@ describe('displays', () => {
 		expect(await drain(d.id)).toEqual([])
 	})
 
-	it('params de la plantilla activa: un valor de otro tipo o fuera de rango → 422 sin publicar', async () => {
-		const { agent } = await registered()
-		const d = await createDisplay(agent)
-		const t = {
-			...goal,
-			id: 'con-params',
-			version: 1,
-			params: { progress: { type: 'number', min: 0, max: 100, default: 0 }, targetText: { type: 'string' } },
-		} as DisplayTemplate
-		await agent
-			.put(api(`${d.path}/template`))
-			.send(t)
-			.expect(200)
-		await drain(d.id)
-		const bad = await agent
-			.patch(api(`${d.path}/data`))
-			.send({ progress: 'mucho' })
-			.expect(422)
-		expect(bad.body).toMatchObject({ error: 'invalid_data', issues: [{ path: ['progress'] }] })
-		await agent
-			.put(api(`${d.path}/data`))
-			.send({ progress: 101 })
-			.expect(422)
-		expect(await drain(d.id)).toEqual([])
-		await agent
-			.patch(api(`${d.path}/data`))
-			.send({ progress: 50, targetText: null, libre: true })
-			.expect(200)
-	})
-
 	it('comandos: offline → 409; trust.* y ota → 422; con presencia → 202, publicado y auditado', async () => {
 		const { agent, user } = await registered()
 		const d = await createDisplay(agent)

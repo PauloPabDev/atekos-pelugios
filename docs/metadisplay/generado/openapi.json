@@ -2,9 +2,9 @@
 	"openapi": "3.1.0",
 	"info": {
 		"title": "MetaDisplay en atekos-pelugios: API REST",
-		"version": "1.1.0",
+		"version": "1.2.0",
 		"description": "Administración de pantallas, plantillas y datos. El dispositivo no la usa: habla solo por WSS /ws/device (ver asyncapi.json). Errores: { error, message?, issues? }.",
-		"x-updated": "2026-11-08",
+		"x-updated": "2026-11-09",
 		"x-max-message-bytes": 1048576
 	},
 	"servers": [
@@ -637,7 +637,7 @@
 						}
 					},
 					"422": {
-						"description": "Valores inválidos o que no cumplen los params de la plantilla activa (invalid_data)",
+						"description": "Valores inválidos",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -710,7 +710,7 @@
 						}
 					},
 					"422": {
-						"description": "Valores inválidos, más de 64 claves o que no cumplen los params de la plantilla activa",
+						"description": "Valores inválidos o más de 64 claves",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1018,57 +1018,6 @@
 							"background": {
 								"type": "string",
 								"pattern": "^#[0-9a-fA-F]{6}$"
-							},
-							"params": {
-								"type": "object",
-								"propertyNames": {
-									"type": "string",
-									"minLength": 1,
-									"maxLength": 40
-								},
-								"additionalProperties": {
-									"type": "object",
-									"properties": {
-										"type": {
-											"type": "string",
-											"enum": [
-												"number",
-												"string",
-												"boolean"
-											]
-										},
-										"default": {
-											"anyOf": [
-												{
-													"type": "string",
-													"maxLength": 140
-												},
-												{
-													"type": "number"
-												},
-												{
-													"type": "boolean"
-												},
-												{
-													"type": "null"
-												}
-											]
-										},
-										"description": {
-											"type": "string",
-											"maxLength": 140
-										},
-										"min": {
-											"type": "number"
-										},
-										"max": {
-											"type": "number"
-										}
-									},
-									"required": [
-										"type"
-									]
-								}
 							},
 							"elements": {
 								"type": "array",
@@ -4232,57 +4181,6 @@
 					"background": {
 						"type": "string",
 						"pattern": "^#[0-9a-fA-F]{6}$"
-					},
-					"params": {
-						"type": "object",
-						"propertyNames": {
-							"type": "string",
-							"minLength": 1,
-							"maxLength": 40
-						},
-						"additionalProperties": {
-							"type": "object",
-							"properties": {
-								"type": {
-									"type": "string",
-									"enum": [
-										"number",
-										"string",
-										"boolean"
-									]
-								},
-								"default": {
-									"anyOf": [
-										{
-											"type": "string",
-											"maxLength": 140
-										},
-										{
-											"type": "number"
-										},
-										{
-											"type": "boolean"
-										},
-										{
-											"type": "null"
-										}
-									]
-								},
-								"description": {
-									"type": "string",
-									"maxLength": 140
-								},
-								"min": {
-									"type": "number"
-								},
-								"max": {
-									"type": "number"
-								}
-							},
-							"required": [
-								"type"
-							]
-						}
 					},
 					"elements": {
 						"type": "array",
