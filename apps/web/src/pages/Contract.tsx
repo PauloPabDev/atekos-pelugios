@@ -1,6 +1,8 @@
 import { Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import * as api from '../api'
+import { Icon, type IconName } from '../components/Icon'
+import '../styles/contract.css'
 
 // Solo lo que lee esta página de los documentos (JSON Schema dentro de AsyncAPI 3.0 y OpenAPI 3.1)
 type Schema = {
@@ -48,11 +50,17 @@ type OpenApi = {
 const METHODS = ['get', 'post', 'put', 'patch', 'delete']
 const REF = '#/components/schemas/'
 const MAX_DEPTH = 8
+// El color del chip dice el sentido: cian sale del dispositivo, violeta del servidor
 const GROUPS = [
-	['device', 'Del dispositivo al servidor'],
-	['server', 'Del servidor al dispositivo'],
+	['device', 'Del dispositivo al servidor', 'cyan'],
+	['server', 'Del servidor al dispositivo', 'violet'],
 ] as const
 const OFFICIAL = 'https://github.com/PauloPabDev/atekos-pelugios/blob/main/docs/metadisplay/CONTRATO.md'
+const DOWNLOADS: [href: string, name: string, text: string, icon: IconName][] = [
+	['/api/v1/contract/asyncapi.json', 'asyncapi.json', 'WebSocket del dispositivo (AsyncAPI 3.0)', 'doc'],
+	['/api/v1/contract/openapi.json', 'openapi.json', 'API REST de pantallas (OpenAPI 3.1)', 'doc'],
+	[OFFICIAL, 'Contrato oficial (CONTRATO.md)', 'El documento de referencia, en GitHub', 'link'],
+]
 
 // La fecha viene como AAAA-MM-DD, que Date lee en UTC: en otra zona saldría el día anterior
 const day = (s: string) =>
@@ -218,68 +226,72 @@ export function Contract() {
 	const o = openapi.data
 
 	return (
-		<>
+		<div className="contract">
 			<h1>Contrato MetaDisplay</h1>
 			{error ? (
 				<p role="alert" className="error">
 					No se pudo cargar el contrato: {error.message}
 				</p>
 			) : !a || !o ? (
-				<p>Cargando…</p>
+				<p className="loading">Cargando…</p>
 			) : (
 				<>
-					<p>
+					<p className="lead">
 						v{a.info.version} · Última actualización:{' '}
 						<time dateTime={a.info['x-updated']}>{day(a.info['x-updated'])}</time>
 					</p>
-					<dl className="meta">
-						<dt>Protocolo</dt>
-						<dd>{a.info['x-protocol']}</dd>
-						<dt>WebSocket</dt>
-						<dd>
-							<code>{`${a.servers.atekos.protocol}://${a.servers.atekos.host}${a.servers.atekos.pathname}`}</code>
-						</dd>
-						<dt>Autenticación</dt>
-						<dd>{a.components.securitySchemes.deviceToken.description}</dd>
-						<dt>Trama máxima</dt>
-						<dd>{a.info['x-max-frame-bytes']} bytes</dd>
-					</dl>
-					<p>{a.info.description}</p>
+					<nav aria-label="Secciones" className="sections">
+						<a href="#descargas">Descargas</a>
+						<a href="#mensajes">Mensajes</a>
+						<a href="#rest">API REST</a>
+						<a href="#esquemas">Esquemas</a>
+					</nav>
+					<div className="card">
+						<dl className="meta">
+							<dt>Protocolo</dt>
+							<dd>{a.info['x-protocol']}</dd>
+							<dt>WebSocket</dt>
+							<dd>
+								<code>{`${a.servers.atekos.protocol}://${a.servers.atekos.host}${a.servers.atekos.pathname}`}</code>
+							</dd>
+							<dt>Autenticación</dt>
+							<dd>{a.components.securitySchemes.deviceToken.description}</dd>
+							<dt>Trama máxima</dt>
+							<dd>{a.info['x-max-frame-bytes']} bytes</dd>
+						</dl>
+						<p>{a.info.description}</p>
+					</div>
 
-					<section>
+					<section id="descargas">
 						<h2>Descargas</h2>
-						<ul className="events">
-							<li>
-								<a href="/api/v1/contract/asyncapi.json" download>
-									asyncapi.json
-								</a>{' '}
-								— WebSocket del dispositivo (AsyncAPI 3.0)
-							</li>
-							<li>
-								<a href="/api/v1/contract/openapi.json" download>
-									openapi.json
-								</a>{' '}
-								— API REST de pantallas (OpenAPI 3.1)
-							</li>
-							<li>
-								<a href={OFFICIAL}>Contrato oficial (CONTRATO.md)</a>
-							</li>
+						<ul className="cards">
+							{DOWNLOADS.map(([href, name, text, icon]) => (
+								<li key={href} className="card row">
+									<span className="tile yellow">
+										<Icon name={icon} />
+									</span>
+									<div className="grow">
+										<a href={href} className="stretch card-title" download={href !== OFFICIAL}>
+											{name}
+										</a>
+										<p className="muted">{text}</p>
+									</div>
+								</li>
+							))}
 						</ul>
 					</section>
 
-					<section>
+					<section id="mensajes">
 						<h2>Mensajes del WebSocket</h2>
-						{GROUPS.map(([from, label]) => (
+						{GROUPS.map(([from, label, color]) => (
 							<Fragment key={from}>
 								<h3>{label}</h3>
-								<ul className="cards" aria-label={label}>
+								<ul className="cards list" aria-label={label}>
 									{Object.values(a.components.messages)
 										.filter((m) => m['x-from'] === from)
 										.map((m) => (
 											<li key={m.name} className="card">
-												<strong>
-													<code>{m.name}</code>
-												</strong>
+												<code className={`chip mono ${color}`}>{m.name}</code>
 												{m.summary && <p>{m.summary}</p>}
 												<SchemaView s={m.payload} />
 											</li>
@@ -289,7 +301,7 @@ export function Contract() {
 						))}
 					</section>
 
-					<section>
+					<section id="rest">
 						<h2>API REST</h2>
 						<p>
 							Base: <code>{o.servers[0]?.url}</code>
@@ -313,7 +325,7 @@ export function Contract() {
 											return (
 												op && (
 													<tr key={`${method} ${path}`}>
-														<td>
+														<td data-method={method}>
 															<code>
 																{method.toUpperCase()} {path}
 															</code>
@@ -340,7 +352,7 @@ export function Contract() {
 						</div>
 					</section>
 
-					<section>
+					<section id="esquemas">
 						<h2>Esquemas</h2>
 						{Object.entries(o.components.schemas).map(([name, s]) => (
 							<section key={name} id={`schema-${name}`}>
@@ -353,6 +365,6 @@ export function Contract() {
 					</section>
 				</>
 			)}
-		</>
+		</div>
 	)
 }
