@@ -3,7 +3,11 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Link, useNavigate, useParams } from 'react-router'
 import { PatchDataInput, type Device, type PatchDeviceInput } from '@atekos/shared'
 import * as api from '../api'
+import { Icon } from '../components/Icon'
+import { Status } from '../components/Status'
 import { putDevice, useDeviceSocket } from '../hooks/useDeviceSocket'
+import { ACTOR, ago, DEVICE_ICON, DEVICE_TYPE, EVENT, fullDate, label, SOURCE } from '../labels'
+import '../styles/devices.css'
 
 const onOff = (s: boolean) => (s ? 'encendido' : 'apagado')
 
@@ -12,6 +16,7 @@ export function DeviceDetail() {
 	const qc = useQueryClient()
 	const navigate = useNavigate()
 	const [confirming, setConfirming] = useState(false)
+	const [copyMsg, setCopyMsg] = useState('')
 	const device = useQuery({ queryKey: ['device', id], queryFn: () => api.getDevice(id) })
 	useDeviceSocket(device.data ? [id] : [])
 	// La clave incluye updatedAt: cada cambio (propio o por WS) recarga el historial solo
@@ -34,7 +39,18 @@ export function DeviceDetail() {
 		},
 	})
 
-	if (device.isPending) return <p>Cargando…</p>
+	const copyLink = async () => {
+		const url = new URL(`/p/${id}`, location.origin).href
+		try {
+			await navigator.clipboard.writeText(url)
+			setCopyMsg('Enlace copiado.')
+		} catch {
+			// navigator.clipboard no existe fuera de HTTPS/localhost (p. ej. el celular por IP de la LAN)
+			setCopyMsg(`No se pudo copiar; cópialo a mano: ${url}`)
+		}
+	}
+
+	if (device.isPending) return <p className="loading">Cargando…</p>
 	if (device.error)
 		return (
 			<p role="alert" className="error">
@@ -45,39 +61,99 @@ export function DeviceDetail() {
 
 	return (
 		<>
-			<p>
-				<Link to="/">← Mis dispositivos</Link>
-			</p>
-			<h1>{d.name}</h1>
-			<div className="card row">
-				<span className={`state ${d.state ? 'on' : 'off'}`}>{d.state ? 'Encendido' : 'Apagado'}</span>
-				<span className="grow muted">
-					{d.type} · {d.slug}
-				</span>
-				<button type="button" onClick={() => toggle.mutate()} disabled={toggle.isPending}>
-					{d.state ? 'Apagar' : 'Encender'}
-				</button>
-			</div>
-			{toggle.error && (
-				<p role="alert" className="error">
-					{toggle.error.message}
-				</p>
-			)}
-			<p className="muted">
-				Id: <code>{d.id}</code>
-				{d.visibility === 'public' && (
-					<>
-						{' · '}
-						<Link to={`/p/${d.id}`}>Vista pública</Link>
-					</>
+			<Link to="/" className="back">
+				<Icon name="back" />
+				Mis dispositivos
+			</Link>
+			<div className="card device-hero">
+				<div className="row">
+					<span className={`tile ${d.state ? 'green' : 'off'}`}>
+						<Icon name={DEVICE_ICON[d.type] ?? 'cube'} />
+					</span>
+					<h1 className="grow">{d.name}</h1>
+					<button
+						type="button"
+						role="switch"
+						aria-checked={d.state}
+						aria-label={d.name}
+						aria-busy={toggle.isPending}
+						className="switch big"
+						// sin disabled para que se vea el meneo de aria-busy; el if evita un doble toggle
+						onClick={() => {
+							if (!toggle.isPending) toggle.mutate()
+						}}
+					/>
+				</div>
+				<div className="chips">
+					<span className={`state ${d.state ? 'on' : 'off'}`}>{d.state ? 'Encendido' : 'Apagado'}</span>
+					<span className="chip">{label(DEVICE_TYPE, d.type)}</span>
+					<span className="chip mono">{d.slug}</span>
+				</div>
+				{toggle.error && (
+					<p role="alert" className="error">
+						{toggle.error.message}
+					</p>
 				)}
-			</p>
+				{d.visibility === 'public' && (
+					<div className="row">
+						<Link to={`/p/${d.id}`} className="button">
+							<Icon name="eye" />
+							Vista pública
+						</Link>
+						<button type="button" onClick={copyLink}>
+							<Icon name="copy" />
+							Copiar enlace
+						</button>
+						<span role="status">{copyMsg}</span>
+					</div>
+				)}
+				<p className="muted">
+					<small>
+						Id: <code>{d.id}</code>
+					</small>
+				</p>
+			</div>
 
-			<section>
+			<nav aria-label="Secciones" className="sections">
+				<a href="#historial">Historial</a>
+				<a href="#ajustes">Ajustes</a>
+				<a href="#datos">Datos</a>
+				<a href="#borrar">Borrar</a>
+			</nav>
+
+			<section id="historial">
+				<h2>Historial</h2>
+				{events.isPending && <p className="loading">Cargando…</p>}
+				{events.error && (
+					<p role="alert" className="error">
+						{events.error.message}
+					</p>
+				)}
+				{events.data?.length === 0 && <p className="muted">Sin eventos todavía.</p>}
+				<ol className="timeline">
+					{events.data?.map((ev, i) => (
+						<li key={`${ev.ts}-${i}`} className={ev.after?.state ? 'on' : 'off'}>
+							<time dateTime={ev.ts} title={fullDate(ev.ts)}>
+								{ago(ev.ts)}
+							</time>
+							<strong>{label(EVENT, ev.type)}</strong>
+							{ev.before && ev.after && ev.before.state !== ev.after.state
+								? ` (${onOff(ev.before.state)} → ${onOff(ev.after.state)})`
+								: ''}
+							<span className="muted">
+								{' '}
+								· {label(ACTOR, ev.actor.kind)} · {label(SOURCE, ev.source)}
+							</span>
+						</li>
+					))}
+				</ol>
+			</section>
+
+			<section id="ajustes">
 				<h2>Datos generales</h2>
 				<form
 					key={d.id}
-					className="stack"
+					className="card stack"
 					onSubmit={(e) => {
 						e.preventDefault()
 						patch.mutate(Object.fromEntries(new FormData(e.currentTarget)) as PatchDeviceInput)
@@ -104,61 +180,43 @@ export function DeviceDetail() {
 						</p>
 					)}
 					<div className="row">
-						<button disabled={patch.isPending}>Guardar</button>
-						<span role="status">{patch.isSuccess && 'Guardado.'}</span>
+						<button className="primary" disabled={patch.isPending}>
+							Guardar
+						</button>
+						<Status m={patch} text="Guardado." />
 					</div>
 				</form>
 			</section>
 
 			<DataForm key={d.id} device={d} />
 
-			<section>
-				<h2>Historial</h2>
-				{events.error && (
-					<p role="alert" className="error">
-						{events.error.message}
-					</p>
-				)}
-				{events.data?.length === 0 && <p className="muted">Sin eventos todavía.</p>}
-				<ol className="events">
-					{events.data?.map((ev, i) => (
-						<li key={`${ev.ts}-${i}`}>
-							<time dateTime={ev.ts}>{new Date(ev.ts).toLocaleString()}</time> {ev.type}
-							{ev.before && ev.after && ev.before.state !== ev.after.state
-								? ` (${onOff(ev.before.state)} → ${onOff(ev.after.state)})`
-								: ''}
-							<span className="muted">
-								{' '}
-								· {ev.actor.kind} · {ev.source}
-							</span>
-						</li>
-					))}
-				</ol>
-			</section>
-
-			<section>
+			<section id="borrar">
 				<h2>Borrar</h2>
 				{confirming ? (
 					<div className="card confirm">
 						<p>¿Borrar «{d.name}»? También se borran sus tokens ligados. No se puede deshacer.</p>
 						<div className="row">
-							<button type="button" className="danger" onClick={() => del.mutate()} disabled={del.isPending}>
+							<button type="button" className="danger-solid" onClick={() => del.mutate()} disabled={del.isPending}>
 								Sí, borrar
 							</button>
 							<button type="button" autoFocus onClick={() => setConfirming(false)}>
 								Cancelar
 							</button>
 						</div>
+						{del.error && (
+							<p role="alert" className="error">
+								{del.error.message}
+							</p>
+						)}
 					</div>
 				) : (
-					<button type="button" className="danger" onClick={() => setConfirming(true)}>
-						Borrar dispositivo
-					</button>
-				)}
-				{del.error && (
-					<p role="alert" className="error">
-						{del.error.message}
-					</p>
+					<div className="card danger-zone">
+						<p className="muted">Borra el dispositivo, su historial y sus tokens ligados.</p>
+						<button type="button" className="danger" onClick={() => setConfirming(true)}>
+							<Icon name="trash" />
+							Borrar dispositivo
+						</button>
+					</div>
 				)}
 			</section>
 		</>
@@ -193,9 +251,9 @@ function DataForm({ device }: { device: Device }) {
 	}
 
 	return (
-		<section>
+		<section id="datos">
 			<h2>Data</h2>
-			<form className="stack" onSubmit={onSubmit}>
+			<form className="card stack" onSubmit={onSubmit}>
 				<label>
 					data (JSON)
 					<textarea
@@ -214,8 +272,10 @@ function DataForm({ device }: { device: Device }) {
 					</p>
 				)}
 				<div className="row">
-					<button disabled={save.isPending}>Guardar data</button>
-					<span role="status">{save.isSuccess && 'Guardado.'}</span>
+					<button className="primary" disabled={save.isPending}>
+						Guardar data
+					</button>
+					<Status m={save} text="Guardado." />
 				</div>
 			</form>
 		</section>
