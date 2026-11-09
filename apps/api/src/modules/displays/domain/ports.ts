@@ -1,4 +1,11 @@
-import type { DisplayCommand, DisplayEvent, DisplayServerMessage, DisplayTemplate, DisplayValues } from '@atekos/shared'
+import type {
+	DisplayCommand,
+	DisplayEvent,
+	DisplayInfo,
+	DisplayServerMessage,
+	DisplayTemplate,
+	DisplayValues,
+} from '@atekos/shared'
 
 /** Fila de `displays` con las fechas en ISO. `hardwareId` es el `deviceId` público ('md-34B7DA01ABCD'). */
 export type DisplayRecord = {
@@ -8,6 +15,8 @@ export type DisplayRecord = {
 	name: string
 	activeTemplateId: string
 	values: DisplayValues
+	info: DisplayInfo | null
+	lastSeenAt: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -37,6 +46,8 @@ export interface DisplayRepository {
 	replaceValues(id: string, values: DisplayValues): Promise<DisplayRecord>
 	/** Merge superficial (jsonb ||). 422 `invalid_data` si el resultado pasa de 64 claves. */
 	mergeValues(id: string, patch: DisplayValues): Promise<DisplayRecord>
+	/** Último contacto de la placa (ahora) y, si llega, su ficha. No toca `updatedAt`: no es un cambio del dueño. */
+	seen(id: string, info?: DisplayInfo): Promise<void>
 	/** Borra la pantalla y devuelve los hashes de sus tokens ligados (caen en cascada). */
 	delete(id: string): Promise<string[]>
 }

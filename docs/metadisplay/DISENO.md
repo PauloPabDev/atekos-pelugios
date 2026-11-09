@@ -18,16 +18,18 @@
 | Plantillas | Cada pantalla guarda **varias** plantillas (una por `template.id`) y una de ellas es la **activa**. Los valores (`values`) son **uno por pantalla**, compartidos entre sus plantillas, igual que en el demo. |
 | Versionado | Al guardar una plantilla con un `id` que ya existe, su `version` debe ser **mayor** que la guardada; si no, 409 `version_not_incremented`. El dispositivo cachea por `id`+`version`, así que sin esta regla un cambio podría no llegarle nunca. |
 | Toques | Hay **reglas declarativas** por `action.event` (§5). Dedupe por `eventId` en Redis, historial en Mongo. |
-| Comandos | **≠** Solo `display.refresh` y `display.brightness`. Los comandos `trust.stage`, `trust.activate` y `ota.install` dan **422 `command_not_allowed`** hasta que el hardware esté homologado. |
-| Web | Sección «Pantallas» con vista previa SVG (172×320 o 320×172, con animación), editores JSON, lista de las variables que usa la plantilla, importación de imágenes, estado online, eventos y comandos. Los datos en vivo se obtienen por **polling** cada 3 s (`refetchInterval`). **≠** No se extiende el protocolo de `/ws` web. |
+| Comandos | **≠** Solo `display.refresh`, `display.brightness` y `display.info` (1.3). Los comandos `trust.stage`, `trust.activate` y `ota.install` dan **422 `command_not_allowed`** hasta que el hardware esté homologado. |
+| Web | Sección «Pantallas» con vista previa SVG (172×320 o 320×172, con animación), editores JSON, lista de las variables que usa la plantilla, Lienzo para importar fotos sin deformarlas, dibujar y editar las imágenes de la plantilla, estado online, eventos y comandos. Los datos en vivo se obtienen por **polling** cada 3 s (`refetchInterval`). **≠** No se extiende el protocolo de `/ws` web. |
 | Varias instancias | Presencia en Redis y canal pub/sub `display-out`: cualquier instancia puede publicar hacia los sockets que tiene otra. |
 | Rotación (1.1) | **≠** `template.rotation` 0/90/180/270: lienzo de 172×320 (vertical) o 320×172 (horizontal). Las coordenadas y los toques van en el sistema girado. Para cambiar de orientación se cambia de plantilla. |
 | Elementos (1.1) | **≠** Además de los oficiales: `circle`, `ellipse`, `polygon`, `arc`, `curve` (Bézier de 3 o 4 puntos) e `image`, y `stroke` (grosor) en las líneas y las formas. **≠** No hay tope de elementos ni de acciones (el oficial era 45 y 24): limita el tamaño en bytes. |
 | Imágenes (1.1) | **≠** Elemento `image` con píxeles RGB565 en base64, sin comprimir (`rgb565`) o en tramos RLE de 3 bytes (`rgb565-rle`). La API los decodifica al validar y exige exactamente w·h píxeles. Van dentro de la plantilla, así que se cachean con ella. |
-| Tamaño (1.1) | **≠** Una plantilla (y cualquier mensaje a la pantalla) puede ocupar hasta `DISPLAY_MAX_TEMPLATE_BYTES`, 1 MB por defecto, que se cambia con una variable de entorno. Más grande → 413. El parser JSON de `/displays` usa ese tope; el resto de la API sigue en 32 KB. |
+| Tamaño (1.1) | **≠** Una plantilla (y cualquier mensaje a la pantalla) puede ocupar hasta `DISPLAY_MAX_TEMPLATE_BYTES`, 1 MB por defecto, que se cambia con una variable de entorno. Más grande → 413. El parser JSON de `/displays` y el del MCP usan ese tope; el resto de la API sigue en 32 KB. |
 | Fragmentos (1.1) | **≠** Un mensaje de más de 8192 bytes viaja en mensajes `frag` seguidos (base64 de trozos de 6000 bytes del JSON) y la pantalla lo reensambla. Responde con `frag.ack`. Los dos son extensiones propias del protocolo oficial. |
 | Variables (1.1, 1.2) | **≠** La plantilla usa las variables de los datos (`values`) por su nombre. Cualquier propiedad se puede ligar a una variable (`binds`), los textos tienen `format` y hay reglas `when` (si variable op valor → `set`). Semántica de referencia: `packages/shared/src/render.ts`. Los valores **solo** llegan por los datos (`PUT`/`PATCH /data` → `data.update`). La 1.1 tenía además `template.params` (tipos, `default` y `min`/`max`), que la 1.2 quitó porque duplicaba los datos. Una plantilla que aún lo lleve se acepta y `params` se descarta. |
 | Animación (1.1) | **≠** `template.animation`: fotogramas con `ms`, dibujados encima de `elements`, y `repeat` (0 = siempre). |
+| Ficha de la placa (1.3) | **≠** El `hello` puede traer `board` (modelo, chip, mac, flash, PSRAM), `display.driver` y `buttons` (`{ button, name, gpio }` por botón). El comando `display.info` pide la ficha y la placa responde con el mensaje nuevo `device.info` (los campos del hello sin `protocol` ni `template`). Se guarda la última en `displays.info` y `DisplayDetail.info` la devuelve; la web la enseña en la pestaña «En vivo» (tarjeta «Placa»). |
+| Último contacto (1.3) | `displays.last_seen_at`: se apunta en el hello, como mucho una vez por minuto con los latidos y al cerrarse el socket. `Display.lastSeenAt` lo devuelve (null si nunca se conectó) y la web lo muestra como «última conexión» cuando está desconectada. No cambia `updatedAt`. |
 | Botones físicos (1.1) | **≠** Acciones con `trigger: 'button'`, `button` 0..15 (índice lógico; el firmware sabe el GPIO), `press` short/long y zona resaltada opcional. Cualquier acción puede llevar un `payload`. El `touch.tap` dice `source`, `button` y `press`, y el historial lo guarda. |
 
 ## 2. Modelo de datos
@@ -66,7 +68,7 @@ Al crear una pantalla se inserta en la misma transacción una plantilla inicial 
 
 | Clave / canal | Uso |
 |---|---|
-| `dpres:{displayId}` (ZSET) | Conexiones vivas: el miembro es el `connId` y el score es su expiración en ms. Online = `ZCOUNT dpres:{id} <ahora> +inf > 0`. Cada heartbeat la renueva (`ZADD`), y el cierre la borra (`ZREM`). La clave entera lleva un `EXPIRE` de 120 s. |
+| `dpres:{displayId}` (ZSET) | Conexiones vivas: el miembro es el `connId` y el score es su expiración en ms. Online = `ZCOUNT dpres:{id} <ahora> +inf > 0`. Cada heartbeat la renueva (`ZADD`, expiración a 25 s), y el cierre la borra (`ZREM`). La clave entera lleva un `EXPIRE` de 120 s. |
 | `dedup:{displayId}:{eventId}` | `SET … NX EX 86400`. Valor `pending` mientras se procesa y luego el `ui.result` en JSON. |
 | canal `display-out` | `{ displayId, message }` → cada instancia lo envía a sus sockets de ese display. `message` puede ser `{ type: 'close' }`, que termina los sockets (borrado de la pantalla). |
 
@@ -94,7 +96,7 @@ Errores dentro de `/displays`:
 - Una plantilla o unos valores que no cumplen el esquema → **422** (`invalid_template` / `invalid_data`, con `issues`), no el 400 genérico de zod.
 - Un cuerpo o un mensaje resultante (`template.set` o `data.update`) de más de **`DISPLAY_MAX_TEMPLATE_BYTES`** (1 MB por defecto) → **413** `message_too_large`. **≠** El oficial ponía el tope en 8192: lo que pasa de ahí viaja troceado (§4).
 
-`Display` = `{ deviceId, name, activeTemplateId, online, createdAt, updatedAt }`.
+`Display` = `{ id, deviceId, name, activeTemplateId, online, lastSeenAt, createdAt, updatedAt }`. `DisplayDetail` añade `template`, `templates`, `values` e `info` (la ficha de la placa o null).
 
 ## 4. WebSocket del dispositivo: `/ws/device`
 
@@ -110,9 +112,11 @@ Errores dentro de `/displays`:
 - Cualquier mensaje antes de un `device.hello` válido → `close(1008)`.
 - Un `hello` con `deviceId` distinto (sin distinguir mayúsculas) del `hardwareId` de la pantalla del token → `close(1008)`. Lo mismo si `protocol !== 1`.
 - Un `type` desconocido se ignora.
-- Heartbeat: ping cada 30 s; sin pong → `terminate()`. En cada latido se renueva la presencia.
+- Heartbeat: ping cada 10 s; sin pong → `terminate()`. En cada latido se renueva la presencia. Una placa que se apaga no cierra el TCP: así se da por desconectada en 20 s como mucho (antes, 60).
 
-**`device.hello`**: registra el socket (`Map<displayId, Set<ws>>` local + `dpres`). Si `hello.template.id/version` no coincide con la plantilla activa → envía `template.set`. Después **siempre** envía `data.update` `snapshot`, con `templateVersion` de la activa.
+**`device.hello`**: registra el socket (`Map<displayId, Set<ws>>` local + `dpres`). Si `hello.template.id/version` no coincide con la plantilla activa → envía `template.set`. Después **siempre** envía `data.update` `snapshot`, con `templateVersion` de la activa. Guarda la ficha de la placa y el último contacto.
+
+**`device.info`** (1.3): guarda la ficha. Un `deviceId` distinto → `close(1008)`.
 
 **`template.ack` / `data.ack` / `frag.ack` / `trust.ack` / `ota.ack`**: se registran en el log, con `warn` si `ok:false`. No tienen más efectos.
 
@@ -121,7 +125,7 @@ Errores dentro de `/displays`:
 - Se envían seguidos en un mismo tick, así que nada se intercala.
 - Un mensaje mayor que el tope no se envía y queda en el log; no debería ocurrir, porque la REST ya lo rechaza con 413.
 
-**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}`, `display.brightness { percent }` y, para lo que no cabe en una trama, `frag` (1.1). Cada trama ocupa como mucho 8192 bytes: lo que pasa de ahí se trocea. Los que van a todos los sockets de la pantalla (REST, comandos y navegación `screen.*`) pasan por `display-out`; las respuestas a un toque (`ui.result`, `event.ack` y el snapshot de `data.refresh`) van directas al socket que tocó.
+**Mensajes que se envían**: `template.set { template }`, `data.update { templateVersion, strategy, values }`, `ui.result { eventId, status, toast?, patch? }`, `event.ack { eventId }`, `display.refresh {}`, `display.brightness { percent }`, `display.info {}` (1.3) y, para lo que no cabe en una trama, `frag` (1.1). Cada trama ocupa como mucho 8192 bytes: lo que pasa de ahí se trocea. Los que van a todos los sockets de la pantalla (REST, comandos y navegación `screen.*`) pasan por `display-out`; las respuestas a un toque (`ui.result`, `event.ack` y el snapshot de `data.refresh`) van directas al socket que tocó.
 
 ## 5. Toques (`touch.tap`) y reglas declarativas
 

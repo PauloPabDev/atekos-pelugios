@@ -133,7 +133,12 @@ for (i = 0, p = 0; i < len; i += 3) {
 
 **Cómo generar una imagen:**
 
-- **Desde la web.** En el editor de plantillas, «Importar imagen»: eliges un archivo y el tamaño, y se añade el elemento `image` al borrador. La web elige sola la codificación más corta.
+- **Desde la web**, con el **Lienzo** del editor de plantillas (botón «Lienzo e imagen»). Se abre una ventana con un lienzo de `w × h` píxeles reales de la pantalla, ampliado sin suavizar:
+  - **Tamaño y posición:** ancho, alto, `x` e `y`. Por defecto, la pantalla entera según la `rotation` del borrador. Hay atajos para «Pantalla completa» y «Mitad superior» o «Mitad inferior». Si no cabe, lo dice y no deja insertar.
+  - **Foto:** importas un archivo y eliges cómo encaja. «Ajustar» la deja entera, con bandas del color de fondo, y es lo que sale por defecto, así que nunca se deforma. «Rellenar» cubre el lienzo y recorta lo que sobra. «Estirar» la deforma. Además tienes zoom (10 %–400 %), «Mover» para arrastrarla (o las flechas con el lienzo enfocado) y «Centrar».
+  - **Dibujo:** lápiz, borrador, línea, rectángulo, elipse (contorno o relleno), bote de pintura y cuentagotas, con color, paleta y grosor de 1 a 32 px. Se puede deshacer y rehacer (Ctrl+Z y Ctrl+Y). El dibujo va en su propia capa: cambiar la foto, el encaje o el zoom no lo borra, y el borrador solo quita lo dibujado.
+  - **Editar una imagen existente:** el selector «Editar imagen n.º k» la carga a 1:1 y «Reemplazar imagen» la cambia en su sitio. Conserva sus `binds`, `when` y `visible`. Si cambias el ancho o el alto, se vuelve a encajar.
+  - **Resultado:** ves en vivo la codificación (la más corta) y lo que ocupará en la plantilla. Avisa si pasa de 100 KB. «Añadir a la plantilla» la pone al final de `elements`, o al principio con «Como fondo (debajo de todo)». No hay transparencia: lo que no cubren la foto ni el dibujo queda del color de fondo.
 - **Desde TypeScript**, con el mismo código que usa la API: `encodeImage(rgba, w, h)` de `@atekos/shared` devuelve `{ encoding, data }`. `rgba` son los bytes RGBA de cualquier fuente, por ejemplo `ImageData.data` o `sharp().raw()`.
 - **Desde Python**, con Pillow:
 
@@ -302,7 +307,7 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 **Otras formas de enviarlos:**
 
 - **Desde la web:** en el detalle de la pantalla, el editor JSON de «Datos», que muestra encima qué variables usa la plantilla activa.
-- **Desde una IA:** con las herramientas MCP `get_display` (lee la plantilla activa y los valores) y `update_display_data` (envía con merge), ver [`../MCP.md`](../MCP.md).
+- **Desde una IA:** con las herramientas MCP `get_display` (lee la plantilla activa, los valores y las variables que usa) y `update_display_data` (envía con merge, o sustituye todos con `replace: true`). La IA también diseña plantillas, sube imágenes y envía comandos; ver [`../MCP.md`](../MCP.md) y su guía, `get_display_guide`.
 - **Desde la propia pantalla:**
   - `local: set_value` cambia un valor solo en esa pantalla.
   - `event: "data.set"` con `payload` cambia los valores en el servidor y en todas las conexiones.
@@ -316,7 +321,7 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 - **Cambiar el tope:** variable de entorno **`DISPLAY_MAX_TEMPLATE_BYTES`** de la API, en bytes. En local va en `.env`; en producción, en las variables de entorno de Coolify. Después hay que reiniciar la API. El contrato publicado muestra el tope vigente en `info["x-max-message-bytes"]`.
 
   Antes de subirlo, ten en cuenta la flash de la pantalla. Su LittleFS tiene 1,875 MB, y el firmware guarda la plantilla más una copia temporal mientras la escribe. Una plantilla de más de ~900 KB puede no caber, y entonces la pantalla la rechaza con `template.ack ok:false`.
-- **El MCP** acepta cuerpos de hasta 32 KB. Las plantillas con imágenes grandes se envían por la REST.
+- **El MCP** acepta cuerpos con el mismo tope. Sus imágenes van por referencia (`upload_display_image` y `ref:…`, ver [`../MCP.md`](../MCP.md)), así que la IA no copia el base64.
 - **Fragmentación por el WSS:** el firmware solo acepta tramas de 8192 bytes. Un mensaje más grande lo envía el servidor como una serie de `frag`:
 
   ```json

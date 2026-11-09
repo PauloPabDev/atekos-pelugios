@@ -6,6 +6,7 @@ import * as api from '../api'
 import { Icon } from '../components/Icon'
 import { Problems } from '../components/Problems'
 import { EmptyState, IconTile, Loading, PageHeader } from '../components/ui'
+import { ago, fullDate } from '../labels'
 
 export function Online({ online }: { online: boolean }) {
 	return (
@@ -14,6 +15,13 @@ export function Online({ online }: { online: boolean }) {
 			{online ? 'En línea' : 'Sin conexión'}
 		</span>
 	)
+}
+
+// «Sin conexión» dice poco; cuándo se la vio por última vez, sí (Display.lastSeenAt)
+export function lastSeen(ts: string | null, now?: number) {
+	if (!ts) return 'nunca se ha conectado'
+	const when = ago(ts, now)
+	return `última conexión ${when === 'ahora' ? 'hace un momento' : when}`
 }
 
 export function Displays() {
@@ -130,6 +138,9 @@ export function Displays() {
 								<span className="mono">{d.deviceId}</span>
 								{/* Un id de plantilla llega a 64 caracteres: parte la línea antes que desbordar */}
 								<span className="wrap-anywhere">plantilla {d.activeTemplateId}</span>
+								{!d.online && (
+									<span title={d.lastSeenAt ? fullDate(d.lastSeenAt) : undefined}>{lastSeen(d.lastSeenAt)}</span>
+								)}
 							</div>
 						</div>
 						<Online online={d.online} />

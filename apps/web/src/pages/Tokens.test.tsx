@@ -55,6 +55,7 @@ test('display:connect sin pantalla muestra la regla y no envía; con pantalla en
 		name: 'Meta',
 		activeTemplateId: 'inicio',
 		online: false,
+		lastSeenAt: null,
 		createdAt: now,
 		updatedAt: now,
 	}
@@ -155,6 +156,7 @@ test('?pantalla=<id> preselecciona la pantalla, display:connect y un nombre', as
 		name: 'Meta',
 		activeTemplateId: 'inicio',
 		online: false,
+		lastSeenAt: null,
 		createdAt: now,
 		updatedAt: now,
 	}

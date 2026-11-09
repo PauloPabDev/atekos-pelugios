@@ -42,8 +42,9 @@ export function buildApp(c: Container) {
 		if (WRITE_METHODS.has(req.method) && hasBody && !req.is('application/json')) throw UnsupportedMediaType()
 		next()
 	})
-	// Las plantillas pueden llevar imágenes: /displays acepta hasta el tope configurable; el resto, 32kb.
-	app.use('/api/v1/displays', express.json({ limit: c.env.DISPLAY_MAX_TEMPLATE_BYTES }))
+	// Las plantillas pueden llevar imágenes: /displays y el MCP aceptan hasta el tope configurable; el resto, 32kb.
+	// Va antes del general: express.json no vuelve a leer un cuerpo ya leído.
+	app.use(['/api/v1/displays', MCP_PATH], express.json({ limit: c.env.DISPLAY_MAX_TEMPLATE_BYTES }))
 	app.use(express.json({ limit: '32kb' }))
 	if (c.oauth) app.use(MCP_PATH, mcpRoutes(c, c.oauth))
 

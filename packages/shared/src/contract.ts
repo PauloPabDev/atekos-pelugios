@@ -22,7 +22,7 @@ import {
 // Implementa el protocolo oficial (docs/metadisplay/CONTRATO.md, asyncapi.yaml, openapi.yaml) con las
 // diferencias de docs/metadisplay/DISENO.md. Cualquier cambio en el contenido exige subir version y updatedAt:
 // `pnpm contract` se niega a regenerar docs/metadisplay/generado/ si no.
-export const METADISPLAY_CONTRACT = { version: '1.2.0', updatedAt: '2026-11-09', protocol: 1 } as const
+export const METADISPLAY_CONTRACT = { version: '1.3.0', updatedAt: '2026-11-09', protocol: 1 } as const
 
 type Json = Record<string, unknown>
 type Target = 'draft-7' | 'draft-2020-12'
@@ -44,7 +44,9 @@ const schema = (s: z.ZodType, target: Target): Json => {
 
 const SUMMARY: Record<string, string> = {
 	'device.hello':
-		'Primer mensaje tras conectar: identidad, firmware, pantalla y la plantilla en caché (id y version). El deviceId debe ser el de la pantalla a la que está ligado el token.',
+		'Primer mensaje tras conectar: identidad, firmware, placa (board), pantalla (display), botones físicos (buttons), capacidades y la plantilla en caché (id y version). El deviceId debe ser el de la pantalla a la que está ligado el token. El servidor guarda la ficha de la placa y la muestra en la web.',
+	'device.info':
+		'Ficha de la placa (los mismos campos que el hello, sin protocol ni template). Respuesta a display.info; también puede enviarse sola si algo cambia.',
 	'template.ack': 'Confirma o rechaza (ok:false, reason) la plantilla recibida.',
 	'data.ack': 'Confirma un data.update. Con otra templateVersion: ok:false, reason "version_mismatch".',
 	'touch.tap':
@@ -60,6 +62,7 @@ const SUMMARY: Record<string, string> = {
 	frag: 'Trozo de un mensaje de más de 8192 bytes. Los trozos de un mensaje llegan seguidos (seq 0..count-1); concatenando sus data decodificados (bytes en total) sale el JSON del mensaje original, que se procesa como si hubiera llegado entero.',
 	'display.refresh': 'Fuerza un redibujado completo.',
 	'display.brightness': 'Brillo en porcentaje, de 0 a 50.',
+	'display.info': 'Pide a la placa su ficha: responde con device.info.',
 }
 
 const typeOf = (o: z.ZodObject) => (o.shape.type as z.ZodLiteral<string>).value

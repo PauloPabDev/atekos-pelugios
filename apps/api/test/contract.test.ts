@@ -26,8 +26,8 @@ const OFFICIAL = [
 ]
 // Los que el servidor aún no envía (DISENO §1: hasta homologar el hardware).
 const NOT_YET = ['trust.stage', 'trust.activate', 'ota.install']
-// Extensiones propias de la 1.1 (DISENO §1 ≠): mensajes de más de 8192 bytes troceados.
-const EXTENSIONS = ['frag', 'frag.ack']
+// Extensiones propias (DISENO §1 ≠): mensajes troceados (1.1) y ficha de la placa (1.3).
+const EXTENSIONS = ['device.info', 'display.info', 'frag', 'frag.ack']
 
 describe('contrato MetaDisplay', () => {
 	it('docs/metadisplay/generado/ está al día con los esquemas (si no: pnpm contract)', () => {
@@ -41,7 +41,7 @@ describe('contrato MetaDisplay', () => {
 		})
 	})
 
-	it('cubre los mensajes del protocolo oficial salvo los comandos pendientes de homologar, más frag y frag.ack', () => {
+	it('cubre los mensajes del protocolo oficial salvo los comandos pendientes de homologar, más las extensiones propias', () => {
 		const { components } = metaDisplayAsyncApi('https://x.example') as { components: { messages: object } }
 		const messages = Object.keys(components.messages)
 		expect(OFFICIAL.filter((t) => !messages.includes(t))).toEqual(NOT_YET)

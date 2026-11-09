@@ -8,7 +8,7 @@ import { SectionTabs } from '../../components/SectionTabs'
 import { Loading } from '../../components/ui'
 import { hasDraft } from '../../hooks/useDraft'
 import { useTitle } from '../../hooks/useTitle'
-import { Online } from '../Displays'
+import { lastSeen, Online } from '../Displays'
 
 export type DisplayContext = { display: DisplayDetail }
 // Lo que el layout comparte con cada pestaña: la pantalla ya cargada y al día por polling
@@ -63,7 +63,7 @@ export function DisplayLayout() {
 				{...back}
 				tone={d.online ? 'success' : 'neutral'}
 				title={d.name}
-				status={`Muestra «${d.template.id}»`}
+				status={d.online ? `Muestra «${d.template.id}»` : `Desconectada, ${lastSeen(d.lastSeenAt)}`}
 				control={<Online online={d.online} />}
 				sticky={!editing}
 			>

@@ -1,7 +1,7 @@
 import type { RedisClientType as Redis } from 'redis'
 import type { DisplayPresence } from '../domain/ports'
 
-const CONN_TTL_MS = 75_000 // > 2 pings de 30 s: una conexión viva siempre se renueva antes de caducar
+const CONN_TTL_MS = 25_000 // > 2 pings de 10 s: una conexión viva siempre se renueva antes de caducar
 const KEY_TTL_SEC = 120
 const key = (displayId: string) => `dpres:${displayId}`
 
