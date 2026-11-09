@@ -11,7 +11,7 @@ export function PublicDevice() {
 	const d = device.data
 
 	return (
-		<main className="page narrow">
+		<div className="narrow">
 			{device.isPending && <p>Cargando…</p>}
 			{device.error ? (
 				<p role="alert" className="error">
@@ -33,6 +33,6 @@ export function PublicDevice() {
 					</>
 				)
 			)}
-		</main>
+		</div>
 	)
 }

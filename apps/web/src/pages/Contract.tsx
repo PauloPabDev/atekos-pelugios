@@ -218,7 +218,7 @@ export function Contract() {
 	const o = openapi.data
 
 	return (
-		<main className="page">
+		<>
 			<h1>Contrato MetaDisplay</h1>
 			{error ? (
 				<p role="alert" className="error">
@@ -353,6 +353,6 @@ export function Contract() {
 					</section>
 				</>
 			)}
-		</main>
+		</>
 	)
 }

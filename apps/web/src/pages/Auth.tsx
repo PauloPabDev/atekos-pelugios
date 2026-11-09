@@ -1,8 +1,9 @@
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import type { LoginInput, RegisterInput } from '@atekos/shared'
 import * as api from '../api'
+import { BrandMark } from '../components/Icon'
 
 // ?next= solo puede ser una ruta de esta web: «//host» y «/\host» saldrían a otro sitio (open redirect),
 // y el navegador quita tabuladores y saltos de línea de las URL («/\t/host» acaba en «//host»)
@@ -29,11 +30,36 @@ function useEnter<T>(mutationFn: (input: T) => Promise<unknown>) {
 	return { m, onSubmit, keepNext }
 }
 
+// Marca grande, lema y el formulario en una tarjeta; las manchas de color van en el CSS de .auth
+function AuthFrame({ title, children, alt }: { title: string; children: ReactNode; alt: ReactNode }) {
+	return (
+		<main className="auth">
+			<div className="auth-box">
+				<p className="brand">
+					<BrandMark />
+				</p>
+				<p className="tagline">Tu casa, al alcance de un toque.</p>
+				<div className="card">
+					<h1>{title}</h1>
+					{children}
+				</div>
+				<p className="alt">{alt}</p>
+			</div>
+		</main>
+	)
+}
+
 export function Login() {
 	const { m, onSubmit, keepNext } = useEnter<LoginInput>(api.login)
 	return (
-		<main className="page narrow">
-			<h1>Entrar</h1>
+		<AuthFrame
+			title="Entrar"
+			alt={
+				<>
+					¿No tienes cuenta? <Link to={`/register${keepNext}`}>Regístrate</Link>
+				</>
+			}
+		>
 			<form className="stack" onSubmit={onSubmit}>
 				<label>
 					Email
@@ -48,20 +74,25 @@ export function Login() {
 						{m.error.message}
 					</p>
 				)}
-				<button disabled={m.isPending}>Entrar</button>
+				<button className="primary block" disabled={m.isPending} aria-busy={m.isPending}>
+					Entrar
+				</button>
 			</form>
-			<p>
-				¿No tienes cuenta? <Link to={`/register${keepNext}`}>Regístrate</Link>
-			</p>
-		</main>
+		</AuthFrame>
 	)
 }
 
 export function Register() {
 	const { m, onSubmit, keepNext } = useEnter<RegisterInput>(api.register)
 	return (
-		<main className="page narrow">
-			<h1>Crear cuenta</h1>
+		<AuthFrame
+			title="Crear cuenta"
+			alt={
+				<>
+					¿Ya tienes cuenta? <Link to={`/login${keepNext}`}>Entra</Link>
+				</>
+			}
+		>
 			<form className="stack" onSubmit={onSubmit}>
 				<label>
 					Email
@@ -97,11 +128,10 @@ export function Register() {
 						{m.error.message}
 					</p>
 				)}
-				<button disabled={m.isPending}>Crear cuenta</button>
+				<button className="primary block" disabled={m.isPending} aria-busy={m.isPending}>
+					Crear cuenta
+				</button>
 			</form>
-			<p>
-				¿Ya tienes cuenta? <Link to={`/login${keepNext}`}>Entra</Link>
-			</p>
-		</main>
+		</AuthFrame>
 	)
 }
