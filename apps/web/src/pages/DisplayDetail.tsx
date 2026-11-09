@@ -15,9 +15,12 @@ import {
 import type { DisplayCommand, DisplayDetail as Detail, DisplayEvent } from '@atekos/shared'
 import * as api from '../api'
 import { DisplayPreview } from '../components/DisplayPreview'
+import { Icon } from '../components/Icon'
 import { Problems } from '../components/Problems'
+import { Status } from '../components/Status'
 import { goalData, goalTemplate, showcaseTemplate, statusTemplate } from '../examples'
 import { Online } from './Displays'
+import '../styles/displays.css'
 
 const fmt = (v: unknown) => JSON.stringify(v, null, 2)
 
@@ -55,15 +58,27 @@ export function DisplayDetail() {
 
 	// Con datos ya cargados, un fallo del polling no desmonta el panel (perdería los borradores)
 	if (display.data) return <Panel key={deviceId} id={deviceId} d={display.data} pollError={display.error} />
-	if (display.isPending) return <p>Cargando…</p>
+	if (display.isPending) return <p className="loading">Cargando…</p>
 	return (
-		<Problems
-			lines={
-				display.error instanceof api.HttpError && display.error.status === 404
-					? ['Esta pantalla no existe.']
-					: api.errorLines(display.error)
-			}
-		/>
+		<>
+			<BackLink />
+			<Problems
+				lines={
+					display.error instanceof api.HttpError && display.error.status === 404
+						? ['Esta pantalla no existe.']
+						: api.errorLines(display.error)
+				}
+			/>
+		</>
+	)
+}
+
+function BackLink() {
+	return (
+		<Link to="/displays" className="back">
+			<Icon name="back" />
+			Mis pantallas
+		</Link>
 	)
 }
 
@@ -107,38 +122,51 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 
 	return (
 		<>
-			<p>
-				<Link to="/displays">← Mis pantallas</Link>
-			</p>
-			<h1>{d.name}</h1>
-			<Problems lines={api.errorLines(pollError)} />
-			<div className="card row">
-				<Online online={d.online} />
-				<span className="grow muted">
-					<code>{d.deviceId}</code> · plantilla activa {d.template.id} v{d.template.version}
-				</span>
+			<BackLink />
+			<div className="display-head">
+				<h1>{d.name}</h1>
+				<div className="chips">
+					<Online online={d.online} />
+					<span className="chip mono">{d.deviceId}</span>
+					<span className="chip">
+						plantilla activa {d.template.id} v{d.template.version}
+					</span>
+				</div>
 			</div>
+			<Problems lines={api.errorLines(pollError)} />
+			<nav aria-label="Secciones" className="sections">
+				<a href="#plantilla">Plantilla</a>
+				{Object.keys(d.template.params ?? {}).length > 0 && <a href="#parametros">Parámetros</a>}
+				<a href="#datos">Datos</a>
+				<a href="#comandos">Comandos</a>
+				<a href="#eventos">Eventos</a>
+				<a href="#borrar">Borrar</a>
+			</nav>
 
-			<section>
+			<section id="plantilla">
 				<h2>Plantilla</h2>
-				<div className="editor">
-					<div>
-						<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
+				<div className="editor display-editor">
+					<div className="preview-col">
+						<div className="preview-dock">
+							<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
+						</div>
 						{!draft.data && <p className="muted">El borrador tiene errores: se muestra la plantilla activa.</p>}
-						<label className="check">
-							<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} /> Mostrar
-							zonas táctiles
-						</label>
-						{shown.animation && (
+						<div className="row">
 							<label className="check">
-								<input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} /> Reproducir
-								animación
+								<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} />{' '}
+								Mostrar zonas táctiles
 							</label>
-						)}
+							{shown.animation && (
+								<label className="check">
+									<input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} /> Reproducir
+									animación
+								</label>
+							)}
+						</div>
 					</div>
 					<div className="stack">
-						<div className="row">
-							<label className="grow">
+						<div className="card stack">
+							<label>
 								Plantillas guardadas
 								<select ref={pick} key={d.activeTemplateId} defaultValue={d.activeTemplateId}>
 									{d.templates.map((t) => (
@@ -148,26 +176,28 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 									))}
 								</select>
 							</label>
-							<button
-								type="button"
-								onClick={() => activate.mutate(pick.current?.value ?? '')}
-								disabled={activate.isPending}
-							>
-								Activar
-							</button>
-							<button type="button" onClick={edit} disabled={!templates.data}>
-								Abrir en el editor
-							</button>
+							<div className="row">
+								<button
+									type="button"
+									onClick={() => activate.mutate(pick.current?.value ?? '')}
+									disabled={activate.isPending}
+								>
+									Activar
+								</button>
+								<button type="button" onClick={edit} disabled={!templates.data}>
+									Abrir en el editor
+								</button>
+							</div>
+							<Problems lines={[...api.errorLines(activate.error, EXPLAIN), ...api.errorLines(templates.error)]} />
 						</div>
-						<Problems lines={[...api.errorLines(activate.error, EXPLAIN), ...api.errorLines(templates.error)]} />
 						<div className="row">
-							<button type="button" onClick={() => setText(fmt(goalTemplate))}>
+							<button type="button" className="ghost" onClick={() => setText(fmt(goalTemplate))}>
 								Cargar ejemplo
 							</button>
-							<button type="button" onClick={() => setText(fmt(statusTemplate))}>
+							<button type="button" className="ghost" onClick={() => setText(fmt(statusTemplate))}>
 								Cargar ejemplo de estado
 							</button>
-							<button type="button" onClick={() => setText(fmt(showcaseTemplate))}>
+							<button type="button" className="ghost" onClick={() => setText(fmt(showcaseTemplate))}>
 								Cargar ejemplo avanzado
 							</button>
 						</div>
@@ -183,21 +213,29 @@ function Panel({ id, d, pollError }: { id: string; d: Detail; pollError: Error |
 								aria-describedby="template-hint"
 							/>
 						</label>
-						<small id="template-hint">
-							La pantalla cachea por id y versión: para guardar cambios en un id que ya existe, sube la versión.
-						</small>
-						<Problems lines={draft.errors} />
-						<div className="row">
-							<button type="button" onClick={bump} disabled={!draft.data}>
+						{/* «version +1» junto a la pista que lo explica: la barra de guardado queda con dos botones */}
+						<div className="row hint-row">
+							<small id="template-hint" className="grow">
+								La pantalla cachea por id y versión: para guardar cambios en un id que ya existe, sube la versión.
+							</small>
+							<button type="button" className="ghost" onClick={bump} disabled={!draft.data}>
 								version +1
 							</button>
-							<button type="button" onClick={() => saveDraft(true)} disabled={!draft.data || save.isPending}>
+						</div>
+						<Problems lines={draft.errors} />
+						<div className="row save-bar">
+							<button
+								type="button"
+								className="primary"
+								onClick={() => saveDraft(true)}
+								disabled={!draft.data || save.isPending}
+							>
 								Guardar y activar
 							</button>
 							<button type="button" onClick={() => saveDraft(false)} disabled={!draft.data || save.isPending}>
 								Guardar sin activar
 							</button>
-							<span role="status">{save.isSuccess && 'Guardado.'}</span>
+							<Status m={save} text="Guardado." />
 						</div>
 						<Problems lines={api.errorLines(save.error, EXPLAIN)} />
 					</div>
@@ -266,51 +304,53 @@ function ImportImage({ text, setText }: { text: string; setText: (t: string) => 
 	}
 
 	return (
-		<fieldset className="stack">
-			<legend>Importar imagen</legend>
-			<div className="row">
-				<label>
-					Ancho (px)
-					<input
-						type="number"
-						min={1}
-						max={320}
-						value={size.w}
-						placeholder="lienzo"
-						onChange={(e) => setSize({ ...size, w: e.target.value })}
-					/>
-				</label>
-				<label>
-					Alto (px)
-					<input
-						type="number"
-						min={1}
-						max={320}
-						value={size.h}
-						placeholder="lienzo"
-						onChange={(e) => setSize({ ...size, h: e.target.value })}
-					/>
-				</label>
-				<label className="grow">
-					Archivo
-					<input
-						ref={file}
-						type="file"
-						accept="image/*"
-						aria-describedby="import-hint"
-						onChange={(e) => {
-							const f = e.target.files?.[0]
-							if (f) void importFile(f)
-						}}
-					/>
-				</label>
+		<details className="import-image">
+			<summary>Importar imagen</summary>
+			<div className="stack">
+				<div className="row">
+					<label>
+						Ancho (px)
+						<input
+							type="number"
+							min={1}
+							max={320}
+							value={size.w}
+							placeholder="lienzo"
+							onChange={(e) => setSize({ ...size, w: e.target.value })}
+						/>
+					</label>
+					<label>
+						Alto (px)
+						<input
+							type="number"
+							min={1}
+							max={320}
+							value={size.h}
+							placeholder="lienzo"
+							onChange={(e) => setSize({ ...size, h: e.target.value })}
+						/>
+					</label>
+					<label className="grow">
+						Archivo
+						<input
+							ref={file}
+							type="file"
+							accept="image/*"
+							aria-describedby="import-hint"
+							onChange={(e) => {
+								const f = e.target.files?.[0]
+								if (f) void importFile(f)
+							}}
+						/>
+					</label>
+				</div>
+				<small id="import-hint">
+					Se escala al tamaño elegido (vacío = el lienzo entero), se pasa a RGB565 con la compresión más corta y se
+					añade como elemento image en x 0, y 0. Muévelo editando el JSON.
+				</small>
+				<Problems lines={error ? [error] : []} />
 			</div>
-			<small id="import-hint">
-				Se escala al tamaño elegido (vacío = el lienzo entero), se pasa a RGB565 con la compresión más corta y se añade
-				como elemento image en x 0, y 0. Muévelo editando el JSON.
-			</small>
-			<Problems lines={error ? [error] : []} />
-		</fieldset>
+		</details>
 	)
 }
 
@@ -335,10 +375,10 @@ function ParamsForm({ id, template, values }: { id: string; template: DisplayTem
 	const dirty = Object.keys(changed).length > 0
 
 	return (
-		<section>
+		<section id="parametros">
 			<h2>Parámetros</h2>
 			<form
-				className="stack"
+				className="card stack"
 				onSubmit={(e) => {
 					e.preventDefault()
 					if (dirty && !issues.length) send.mutate(changed)
@@ -381,10 +421,10 @@ function ParamsForm({ id, template, values }: { id: string; template: DisplayTem
 				})}
 				<Problems lines={issues} />
 				<div className="row">
-					<button type="submit" disabled={!dirty || issues.length > 0 || send.isPending}>
+					<button type="submit" className="primary" disabled={!dirty || issues.length > 0 || send.isPending}>
 						Enviar parámetros
 					</button>
-					<span role="status">{send.isSuccess && 'Enviado.'}</span>
+					<Status m={send} text="Enviado." />
 				</div>
 				<Problems lines={api.errorLines(send.error, EXPLAIN)} />
 			</form>
@@ -398,6 +438,13 @@ const origin = (ev: DisplayEvent) =>
 		: ev.source === 'touch'
 			? 'toque'
 			: '—'
+
+// Resultado de ui.result en español; un estado nuevo de la API se ve tal cual
+const STATUS: Record<string, [label: string, chip: string]> = {
+	ok: ['Aceptado', 'green'],
+	rejected: ['Rechazado', 'yellow'],
+	error: ['Error', 'pink'],
+}
 
 function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 	const qc = useQueryClient()
@@ -416,9 +463,9 @@ function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 	}
 
 	return (
-		<section>
+		<section id="datos">
 			<h2>Datos</h2>
-			<div className="stack">
+			<div className="card stack">
 				<label>
 					Valores (JSON)
 					<textarea
@@ -435,7 +482,7 @@ function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 				</small>
 				<Problems lines={draft.errors} />
 				<div className="row">
-					<button type="button" onClick={() => setText(fmt(goalData))}>
+					<button type="button" className="ghost" onClick={() => setText(fmt(goalData))}>
 						Cargar datos de ejemplo
 					</button>
 					<button type="button" onClick={() => send(false)} disabled={!draft.data || save.isPending}>
@@ -444,7 +491,7 @@ function DataEditor({ id, values }: { id: string; values: DisplayValues }) {
 					<button type="button" onClick={() => send(true)} disabled={!draft.data || save.isPending}>
 						Combinar
 					</button>
-					<span role="status">{save.isSuccess && 'Guardado.'}</span>
+					<Status m={save} text="Guardado." />
 				</div>
 				<Problems lines={api.errorLines(save.error, EXPLAIN)} />
 			</div>
@@ -457,20 +504,35 @@ function Commands({ id }: { id: string }) {
 	const send = useMutation({ mutationFn: (c: DisplayCommand) => api.sendDisplayCommand(id, c) })
 
 	return (
-		<section>
+		<section id="comandos">
 			<h2>Comandos</h2>
-			<div className="stack">
-				<div className="row">
+			<div className="cards">
+				<div className="card command">
+					<span className="tile">
+						<Icon name="refresh" />
+					</span>
+					<p className="muted">Fuerza un redibujado completo de la pantalla.</p>
 					<button type="button" onClick={() => send.mutate({ type: 'display.refresh' })} disabled={send.isPending}>
 						Refrescar pantalla
 					</button>
 				</div>
-				<div className="row">
-					<label className="grow">
-						Brillo (0 a 50)
-						<input type="range" min={0} max={50} value={percent} onChange={(e) => setPercent(Number(e.target.value))} />
-					</label>
-					<output>{percent}</output>
+				<div className="card command">
+					<span className="tile yellow">
+						<Icon name="sun" />
+					</span>
+					<div className="row">
+						<label className="grow">
+							Brillo (0 a 50)
+							<input
+								type="range"
+								min={0}
+								max={50}
+								value={percent}
+								onChange={(e) => setPercent(Number(e.target.value))}
+							/>
+						</label>
+						<output>{percent}</output>
+					</div>
 					<button
 						type="button"
 						onClick={() => send.mutate({ type: 'display.brightness', percent })}
@@ -479,7 +541,10 @@ function Commands({ id }: { id: string }) {
 						Enviar
 					</button>
 				</div>
-				<span role="status">{send.isSuccess && 'Enviado.'}</span>
+			</div>
+			{/* Un solo envío para los dos comandos: el aviso y el error van debajo de ambos */}
+			<div className="command-result">
+				<Status m={send} text="Enviado." />
 				<Problems lines={api.errorLines(send.error, EXPLAIN)} />
 			</div>
 		</section>
@@ -494,10 +559,12 @@ function Events({ id }: { id: string }) {
 	})
 
 	return (
-		<section>
-			<h2>Eventos táctiles</h2>
+		<section id="eventos">
+			<h2>Eventos</h2>
 			<Problems lines={api.errorLines(events.error)} />
-			{events.data?.length === 0 && <p className="muted">Sin toques todavía.</p>}
+			{events.data?.length === 0 && (
+				<p className="muted">Todavía no hay eventos: aparecen al tocar la pantalla o pulsar sus botones.</p>
+			)}
 			{!!events.data?.length && (
 				<div className="table-wrap">
 					{/* La API ya los devuelve del más reciente al más antiguo */}
@@ -522,7 +589,11 @@ function Events({ id }: { id: string }) {
 									<td>{ev.actionId}</td>
 									<td>{ev.name ?? '—'}</td>
 									<td>{origin(ev)}</td>
-									<td>{ev.status}</td>
+									<td>
+										<span className={`chip ${STATUS[ev.status]?.[1] ?? ''}`}>
+											{STATUS[ev.status]?.[0] ?? ev.status}
+										</span>
+									</td>
 									<td>{ev.toast ?? '—'}</td>
 									<td>
 										{ev.x},{ev.y}
@@ -550,7 +621,7 @@ function DeleteDisplay({ id, name }: { id: string; name: string }) {
 	})
 
 	return (
-		<section>
+		<section id="borrar">
 			<h2>Borrar</h2>
 			{confirming ? (
 				<div className="card confirm">
@@ -559,20 +630,24 @@ function DeleteDisplay({ id, name }: { id: string; name: string }) {
 						deshacer.
 					</p>
 					<div className="row">
-						<button type="button" className="danger" onClick={() => del.mutate()} disabled={del.isPending}>
+						<button type="button" className="danger-solid" onClick={() => del.mutate()} disabled={del.isPending}>
 							Sí, borrar
 						</button>
 						<button type="button" autoFocus onClick={() => setConfirming(false)}>
 							Cancelar
 						</button>
 					</div>
+					<Problems lines={api.errorLines(del.error)} />
 				</div>
 			) : (
-				<button type="button" className="danger" onClick={() => setConfirming(true)}>
-					Borrar pantalla
-				</button>
+				<div className="card danger-zone">
+					<p>Quita la pantalla de tu cuenta con sus plantillas y datos. Sus tokens dejan de funcionar.</p>
+					<button type="button" className="danger" onClick={() => setConfirming(true)}>
+						<Icon name="trash" />
+						Borrar pantalla
+					</button>
+				</div>
 			)}
-			<Problems lines={api.errorLines(del.error)} />
 		</section>
 	)
 }
