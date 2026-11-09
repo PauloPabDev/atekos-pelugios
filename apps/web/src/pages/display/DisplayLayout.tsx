@@ -63,7 +63,7 @@ export function DisplayLayout() {
 				{...back}
 				tone={d.online ? 'success' : 'neutral'}
 				title={d.name}
-				status={`plantilla activa ${d.template.id} v${d.template.version}`}
+				status={`Muestra «${d.template.id}»`}
 				control={<Online online={d.online} />}
 				sticky={!editing}
 			>

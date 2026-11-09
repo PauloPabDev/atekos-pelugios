@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { currentFrame, displaySize, DisplayTemplate, encodeImage } from '@atekos/shared'
 import type { DisplayDetail } from '@atekos/shared'
 import * as api from '../../api'
 import { DisplayPreview } from '../../components/DisplayPreview'
+import { Icon } from '../../components/Icon'
 import { Problems } from '../../components/Problems'
 import { Status } from '../../components/Status'
 import { EmptyState, Loading } from '../../components/ui'
 import { goalTemplate, showcaseTemplate, statusTemplate } from '../../examples'
-import { EXPLAIN, fmt, validate } from './common'
+import { useDraft } from '../../hooks/useDraft'
+import { EXPLAIN, fmt, nextVersion, validate } from './common'
 import { useDisplay } from './DisplayLayout'
 
-const BLANK: DisplayTemplate = { id: 'nueva', version: 1, elements: [], actions: [] }
+// Una vacía con un id libre: así «Guardar» no pisa por descuido una plantilla que ya existe
+function blank(taken: { id: string }[]): DisplayTemplate {
+	let n = taken.length + 1
+	while (taken.some((t) => t.id === `plantilla-${n}`)) n++
+	return { id: `plantilla-${n}`, version: 1, elements: [], actions: [] }
+}
 
 // plantillas/:templateId edita la guardada; plantillas/nueva parte de una vacía
 export function TemplateEditor() {
@@ -24,7 +31,7 @@ export function TemplateEditor() {
 		enabled: !!templateId,
 	})
 
-	if (!templateId) return <Editor d={d} initial={BLANK} />
+	if (!templateId) return <Editor d={d} initial={blank(d.templates)} />
 	if (templates.isPending) return <Loading />
 	if (templates.error) return <Problems lines={api.errorLines(templates.error)} />
 	const t = templates.data.find((t) => t.id === templateId)
@@ -40,55 +47,116 @@ export function TemplateEditor() {
 				}
 			/>
 		)
-	return <Editor key={t.id} d={d} initial={t} />
+	return <Editor key={t.id} d={d} initial={t} saved={t.id} />
 }
 
-function Editor({ d, initial }: { d: DisplayDetail; initial: DisplayTemplate }) {
+// saved: el id de la plantilla guardada que se edita; sin él, es una nueva
+function Editor({ d, initial, saved }: { d: DisplayDetail; initial: DisplayTemplate; saved?: string }) {
 	const id = d.deviceId
+	const base = `/displays/${id}/plantillas`
 	const qc = useQueryClient()
+	const navigate = useNavigate()
+	const title = useRef<HTMLHeadingElement>(null)
+	// Recién creada: el editor de la nueva ruta lo dice y se lleva el foco (el botón pulsado ya no existe)
+	const created = (useLocation().state as { saved?: number } | null)?.saved
+	useEffect(() => {
+		if (created) title.current?.focus()
+	}, [created])
+
+	// Memo: el timer de la animación re-renderiza cada 50 ms y una plantilla puede pesar 1 MB
+	const initialText = useMemo(() => fmt(initial), [initial])
+	// Textarea controlado y en borrador: ni el polling ni cambiar de pestaña lo pisan
+	const [text, setText, draft] = useDraft(`${base}/${saved ?? 'nueva'}`, initialText)
+	const parsed = useMemo(() => validate(DisplayTemplate, text), [text])
+	const [panel, setPanel] = useState<'code' | 'preview'>('code')
+	const [discarding, setDiscarding] = useState(false)
+	const [showActions, setShowActions] = useState(false)
+	const [playing, setPlaying] = useState(false)
+	const shown = parsed.data ?? initial
+	const frame = useFrame(playing ? shown.animation : undefined)
+
+	// La versión se sube sola: la siguiente a la guardada con ese id, salvo que el borrador ya traiga una mayor
+	const stored = d.templates.find((t) => t.id === parsed.data?.id)?.version
+	const next = parsed.data && nextVersion(parsed.data.version, stored)
 	const save = useMutation({
 		mutationFn: ({ t, active }: { t: DisplayTemplate; active: boolean }) =>
 			active ? api.putActiveTemplate(id, t) : api.putDisplayTemplate(id, t),
-		onSuccess: () =>
-			Promise.all([
+		onSuccess: async (_, { t }) => {
+			await Promise.all([
 				qc.invalidateQueries({ queryKey: ['display', id] }),
 				qc.invalidateQueries({ queryKey: ['display-templates', id] }),
-			]),
+			])
+			draft.reset()
+			// Nueva, o renombrada en el JSON: su editor es otra ruta
+			if (t.id !== saved)
+				navigate(`${base}/${encodeURIComponent(t.id)}`, { replace: true, state: { saved: t.version } })
+		},
+		// Un 409 es una carrera con otra pestaña: al recargar las versiones, el siguiente intento ya acierta
+		onError: () => qc.invalidateQueries({ queryKey: ['display', id] }),
 	})
-	// Textarea controlado: el polling no pisa el borrador
-	const [text, setText] = useState(() => fmt(initial))
-	const [showActions, setShowActions] = useState(false)
-	const [playing, setPlaying] = useState(false)
-	// Memo: el timer de la animación re-renderiza cada 50 ms y una plantilla puede pesar 1 MB
-	const draft = useMemo(() => validate(DisplayTemplate, text), [text])
-	const shown = draft.data ?? d.template
-	const frame = useFrame(playing ? shown.animation : undefined)
-
 	const saveDraft = (active: boolean) => {
-		if (draft.data) save.mutate({ t: draft.data, active })
+		if (parsed.data && next) save.mutate({ t: { ...parsed.data, version: next }, active })
 	}
-	const bump = () => {
-		if (draft.data) setText(fmt({ ...JSON.parse(text), version: draft.data.version + 1 }))
-	}
+	const errors = parsed.errors.length
 
 	return (
 		<section>
-			<h2 className="mb-3">Plantilla</h2>
+			<div className="mb-3 flex items-center gap-2">
+				<Link to={base} aria-label="Volver a las plantillas" className="btn btn-icon btn-ghost -ml-3 sm:-ml-2">
+					<Icon name="back" size={20} />
+				</Link>
+				<div className="min-w-0 flex-1">
+					<h2 ref={title} tabIndex={-1} className="truncate">
+						{saved ? `Editar «${saved}»` : 'Nueva plantilla'}
+					</h2>
+					<p className="truncate text-sm text-fg-muted">
+						{next === undefined
+							? 'Corrige los errores para poder guardar.'
+							: stored === undefined
+								? `Se guardará como v${next}.`
+								: parsed.data?.id !== saved
+									? `Ya existe «${parsed.data?.id}» v${stored}: se guardará encima como v${next}.`
+									: `v${stored} → se guardará como v${next}`}
+						{draft.dirty && ' · Sin guardar'}
+					</p>
+				</div>
+			</div>
+
+			{/* Móvil: un panel a pantalla completa cada vez; desde lg, los dos a la vez */}
+			<div className="sticky top-14 z-20 -mx-4 mb-3 bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:hidden">
+				<div
+					role="radiogroup"
+					aria-label="Panel"
+					className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-subtle p-1"
+				>
+					{(
+						[
+							['code', errors ? `Código (${errors} ${errors === 1 ? 'error' : 'errores'})` : 'Código'],
+							['preview', 'Vista previa'],
+						] as const
+					).map(([p, label]) => (
+						<label
+							key={p}
+							className="grid h-11 cursor-pointer place-items-center rounded-md text-sm font-medium text-fg-muted has-checked:bg-surface has-checked:text-fg has-checked:shadow-xs has-focus-visible:outline-2 has-focus-visible:outline-brand sm:h-9"
+						>
+							<input type="radio" name="panel" className="sr-only" checked={panel === p} onChange={() => setPanel(p)} />
+							{label}
+						</label>
+					))}
+				</div>
+			</div>
+
 			<div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-8">
-				{/* En el móvil la columna se disuelve: la vista previa queda fija durante todo el editor */}
-				<div className="max-lg:contents lg:sticky lg:top-8 lg:space-y-2">
-					<div className="sticky top-14 z-20 -mx-4 border-b border-line bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
-						{/* Ancho y alto auto: manda el tamaño ×2 del SVG, recortado por los máximos sin deformarse;
-						    en el móvil, más de 24svh deja el JSON en pocas líneas entre la cabecera y el pie */}
-						<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[24svh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-22rem)]">
-							<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
-						</div>
-						{!draft.data && (
-							<p className="mt-1.5 text-center text-xs text-warning-fg">
-								El borrador tiene errores: se muestra la plantilla activa.
-							</p>
-						)}
+				<div className={`space-y-2 lg:sticky lg:top-8 ${panel === 'code' ? 'max-lg:hidden' : ''}`}>
+					{/* Ancho y alto auto: manda el tamaño ×2 del SVG, recortado por los máximos sin deformarse */}
+					<div className="mx-auto w-fit max-w-full rounded-xl bg-zinc-900 p-2 [&_svg]:h-auto [&_svg]:max-h-[calc(100svh-17rem)] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[calc(100svh-22rem)]">
+						<DisplayPreview template={shown} values={d.values} showActions={showActions} frame={frame} />
 					</div>
+					{!parsed.data && (
+						<p className="text-center text-xs text-warning-fg">
+							El borrador tiene errores: se muestra la versión guardada.
+						</p>
+					)}
 					<div className="flex flex-wrap gap-x-5">
 						<label className="check">
 							<input type="checkbox" checked={showActions} onChange={(e) => setShowActions(e.target.checked)} />
@@ -102,7 +170,7 @@ function Editor({ d, initial }: { d: DisplayDetail; initial: DisplayTemplate }) 
 						)}
 					</div>
 				</div>
-				<div className="mt-3 space-y-4 lg:mt-0">
+				<div className={`space-y-4 ${panel === 'preview' ? 'max-lg:hidden' : ''}`}>
 					<div className="divide-y divide-line rounded-lg border border-line bg-surface px-3">
 						<details>
 							<summary>Ejemplos</summary>
@@ -128,47 +196,74 @@ function Editor({ d, initial }: { d: DisplayDetail; initial: DisplayTemplate }) 
 								onChange={(e) => setText(e.target.value)}
 								rows={18}
 								spellCheck={false}
-								aria-invalid={!draft.data}
+								className="max-lg:h-[calc(100svh-15rem)] lg:min-h-[60svh]"
+								aria-invalid={!parsed.data}
 								aria-describedby="template-hint"
 							/>
 						</label>
 						<small id="template-hint">
-							La pantalla cachea por id y versión: para guardar cambios en un id que ya existe, sube la versión.
+							La versión se sube sola al guardar: la pantalla guarda en caché cada id y versión.
 						</small>
 					</div>
-					<Problems lines={draft.errors} />
-					{/* En el móvil el editor va sin las pestañas de la app (App.tsx): guardar queda abajo del todo, sobre el
-					    área segura; el error de guardado va dentro, junto a los botones */}
-					<div className="sticky bottom-0 z-20 -mx-4 space-y-2 border-t border-line bg-canvas px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
-						<Problems lines={api.errorLines(save.error, EXPLAIN)} />
-						<div className="flex flex-wrap items-center gap-2">
-							<button type="button" className="btn btn-ghost" onClick={bump} disabled={!draft.data}>
-								version +1
+					<Problems lines={parsed.errors} />
+				</div>
+			</div>
+
+			{/* En el móvil el editor va sin las pestañas de la app (App.tsx): guardar queda abajo del todo, sobre el
+			    área segura; el error de guardado va dentro, junto a los botones */}
+			<div className="sticky bottom-0 z-20 -mx-4 mt-4 space-y-2 border-t border-line bg-canvas px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:pl-[22rem]">
+				<Problems lines={api.errorLines(save.error, EXPLAIN)} />
+				{discarding ? (
+					<div className="flex flex-wrap items-center gap-2">
+						<p className="mr-auto text-sm text-fg">¿Descartar los cambios de «{saved ?? 'la plantilla nueva'}»?</p>
+						<button
+							type="button"
+							className="btn btn-danger"
+							onClick={() => {
+								draft.reset()
+								setDiscarding(false)
+								title.current?.focus()
+							}}
+						>
+							Descartar
+						</button>
+						<button type="button" className="btn btn-secondary" autoFocus onClick={() => setDiscarding(false)}>
+							Seguir editando
+						</button>
+					</div>
+				) : (
+					<div className="flex flex-wrap items-center gap-2">
+						{draft.dirty && (
+							<button type="button" className="btn btn-ghost -ml-3" onClick={() => setDiscarding(true)}>
+								Descartar
 							</button>
-							<div className="mr-auto">
-								<Status m={save} text="Guardado." />
-							</div>
-							<div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-								<button
-									type="button"
-									className="btn btn-secondary"
-									onClick={() => saveDraft(false)}
-									disabled={!draft.data || save.isPending}
-								>
-									Guardar sin activar
-								</button>
-								<button
-									type="button"
-									className="btn btn-primary"
-									onClick={() => saveDraft(true)}
-									disabled={!draft.data || save.isPending}
-								>
-									Guardar y activar
-								</button>
-							</div>
+						)}
+						<div className="mr-auto">
+							<Status
+								m={save.isIdle && created ? { isSuccess: true, submittedAt: 0 } : save}
+								text={`Guardada como v${save.variables?.t.version ?? created}.`}
+							/>
+						</div>
+						<div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+							<button
+								type="button"
+								className="btn btn-secondary"
+								onClick={() => saveDraft(false)}
+								disabled={!next || save.isPending}
+							>
+								Guardar
+							</button>
+							<button
+								type="button"
+								className="btn btn-primary"
+								onClick={() => saveDraft(true)}
+								disabled={!next || save.isPending}
+							>
+								Guardar y activar
+							</button>
 						</div>
 					</div>
-				</div>
+				)}
 			</div>
 		</section>
 	)
