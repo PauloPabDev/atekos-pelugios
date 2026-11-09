@@ -1,10 +1,10 @@
-# Plantillas MetaDisplay: guía práctica (contrato 1.1)
+# Plantillas MetaDisplay: guía práctica (contrato 1.2)
 
-Una **plantilla** es un JSON que dice qué dibuja la pantalla y qué pasa al tocarla o al pulsar un botón. Los **valores** (`values`) son las variables que la rellenan.
+Una **plantilla** es un JSON que dice qué dibuja la pantalla y qué pasa al tocarla o al pulsar un botón. Los **datos** (`values`) son las variables que la rellenan. Llegan por la inyección de siempre: se envían con `PUT`/`PATCH /data` y la pantalla los recibe como `data.update`.
 
-Piensa en la plantilla como en una **función**:
-- `params` es su firma: qué variables espera, de qué tipo y con qué valor por defecto.
-- Los valores que envías son los argumentos.
+Las «funciones» de la plantilla (`bind`, `binds`, `format` y las reglas `when`) trabajan con esas variables:
+- La plantilla no declara sus variables: las **nombra**. Por ejemplo, `"bind": "temp"` o `"format": "Temp: {temp} C"` leen la variable `temp` de los datos.
+- Los valores llegan **solo por los datos**. La plantilla no trae valores propios ni valores por defecto.
 - La pantalla redibuja cada vez que cambia un valor.
 
 La plantilla se guarda una vez y se cachea en la pantalla por `id` + `version`. Los valores van y vienen todas las veces que quieras sin reenviarla.
@@ -12,7 +12,7 @@ La plantilla se guarda una vez y se cachea en la pantalla por `id` + `version`. 
 | Qué | Dónde está |
 |---|---|
 | Esquemas: la fuente de verdad, de donde sale el contrato | [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts) |
-| Semántica de `binds`, `when`, `format`, valores por defecto y animación | [`packages/shared/src/render.ts`](../../packages/shared/src/render.ts) |
+| Semántica de `bind`, `binds`, `when`, `format` y animación | [`packages/shared/src/render.ts`](../../packages/shared/src/render.ts) |
 | Codificación de imágenes | [`packages/shared/src/image.ts`](../../packages/shared/src/image.ts) |
 | Ejemplo con todo lo de esta guía | [`examples/showcase-template.json`](examples/showcase-template.json); en la web, «Cargar ejemplo avanzado» |
 | Contrato publicado (versión y fecha) | `/contrato`, `GET /api/v1/contract/asyncapi.json` ([`README.md`](README.md)) |
@@ -25,7 +25,6 @@ La plantilla se guarda una vez y se cachea en la pantalla por `id` + `version`. 
   "version": 3,
   "rotation": 90,
   "background": "#090D18",
-  "params":    { "temp": { "type": "number", "default": 21, "description": "Temperatura" } },
   "elements":  [ { "type": "text", "x": 10, "y": 10, "size": 2, "format": "Temp: {temp} C" } ],
   "animation": { "frames": [ { "ms": 500, "elements": [] } ], "repeat": 0 },
   "actions":   [ { "id": "pulsar", "trigger": "button", "button": 0, "mode": "remote", "event": "data.set", "payload": { "estado": "ON" } } ]
@@ -38,7 +37,6 @@ La plantilla se guarda una vez y se cachea en la pantalla por `id` + `version`. 
 | `version` | sí | Entero. Si guardas otra vez el mismo `id`, la versión tiene que **subir**; si no, la API responde 409 `version_not_incremented`. |
 | `rotation` | no | `0` (por defecto), `90`, `180` o `270`. Ver §2. |
 | `background` | no | Color de fondo `#RRGGBB`. |
-| `params` | no | La firma de la plantilla, hasta 64 parámetros. Ver §7. |
 | `elements` | sí | Lo que se dibuja, en orden: el último queda encima. Ver §3. |
 | `animation` | no | Fotogramas que se dibujan encima de `elements`. Ver §5. |
 | `actions` | sí (puede ser `[]`) | Toques y botones físicos. Ver §6. |
@@ -183,7 +181,7 @@ Una plantilla con imágenes grandes puede ocupar cientos de KB. Viaja por el WSS
 | `trigger` | `tap`: una zona táctil (`x,y,w,h` obligatorios). `button`: un **botón físico**. |
 | `button` | Solo con `button`: el índice lógico del botón, de **0 a 15**. El 0 es el BOOT de la placa; el resto, los botones que se conecten, en el orden que fije el firmware, que es quien sabe en qué GPIO está cada uno. El `device.hello` dice cuántos tiene en `display.buttons`. |
 | `press` | Solo con `button`: `short` (por defecto) o `long`. Un mismo botón puede tener una acción corta y otra larga, pero no dos iguales. |
-| `x,y,w,h` | En `button` son opcionales y van los cuatro juntos: la zona que la pantalla **resalta** para ese botón (qué botón se ve en la pantalla). |
+| `x,y,w,h` | En `button` son opcionales y van los cuatro juntos: la zona que la pantalla **resalta** para ese botón (qué botón se ve en la pantalla): al pulsarlo, la pantalla dibuja un contorno alrededor durante un momento. |
 | `mode` | `local`: solo actúa la pantalla, sin enviar nada. `remote`: envía el evento y espera la respuesta. `hybrid`: hace las dos cosas. |
 | `local` | Lo que hace la pantalla en `local`/`hybrid`: `{ "kind": "feedback", "message": "..." }` (≤ 24 caracteres) o `{ "kind": "set_value", "key": "...", "value": ... }`. |
 | `event` | Qué hace el servidor (tabla siguiente). |
@@ -210,22 +208,17 @@ Ejemplo: el botón 0 corto marca la alarma y uno largo la quita.
   "mode": "remote", "event": "data.set", "payload": { "estado": "OK", "alarma": false } }
 ```
 
-## 7. Parámetros: la plantilla como función
+## 7. Variables: las funciones de la plantilla
 
-### 7.1 Declarar la firma (`params`)
+### 7.1 De dónde salen las variables
 
-```json
-"params": {
-  "temp":   { "type": "number",  "default": 21, "min": -20, "max": 60, "description": "Temperatura en grados" },
-  "alarma": { "type": "boolean", "default": false, "description": "Muestra el aviso rojo" },
-  "estado": { "type": "string",  "default": "OK" }
-}
-```
-
-- `type` es `number`, `string` o `boolean`. `min` y `max` solo se aplican a los números. `description` tiene hasta 140 caracteres.
-- `default` es el valor que se dibuja **mientras no se haya enviado esa variable**. Lo aplica quien dibuja, la pantalla o la vista previa, con `withDefaults`.
-- La API **valida** contra los `params` de la plantilla **activa** todo lo que se envía a `PUT`/`PATCH /data`. Con el tipo equivocado o fuera de rango, responde 422 `invalid_data` con el detalle en `issues`. Las variables no declaradas y `null` se aceptan, porque los valores se comparten entre todas las plantillas de la pantalla.
-- La web dibuja un formulario «Parámetros» con esta firma. Es la forma más cómoda de probar.
+- Una variable es una clave de los **datos** de la pantalla (`values`). Se envían con `PUT`/`PATCH /data` (§8) y la pantalla las recibe en un `data.update`, como siempre. No hay otra vía: la plantilla solo nombra las variables y no les da valor.
+- No hay que declararlas. Cualquier clave de los datos se puede usar en cualquier elemento.
+- **Una variable que aún no se ha enviado** deja el texto vacío con `bind` y `format`, conserva la propiedad original con `binds` y, en `when`, cuenta como ausente (tabla de `op` más abajo).
+- **Valor de reserva:** si quieres que se vea algo mientras no llega la variable, pon ese algo en la propiedad base y usa `binds` en lugar de `bind`. Por ejemplo, `{ "type": "text", "x": 10, "y": 10, "value": "--", "binds": { "value": "temp" } }` dibuja `--` hasta que llega `temp`.
+- La API no comprueba de qué tipo es cada variable. Al dibujar, cada valor se convierte al tipo de la propiedad y, si no se puede, se ignora (§7.3). Los límites de los datos están en §8.
+- Los datos son de la pantalla, no de la plantilla: todas sus plantillas los comparten.
+- En la web, la sección «Datos» lista las variables que usa la plantilla activa y marca las que aún no tienen valor. La lista sale de `templateVariables(plantilla)`, en `render.ts`.
 
 ### 7.2 Usar las variables en los elementos
 
@@ -270,17 +263,17 @@ Para cada elemento, en cada redibujado:
 5. Si `visible` acaba en `false`, el elemento no se dibuja.
 6. Si hay `format`, se rellenan sus huecos y ese es el texto.
 
-La función de referencia es `resolveElement(elemento, withDefaults(plantilla, valores))`, en `render.ts`. La API valida cada `set` como si fuera el elemento entero (tipos, colores y que no se salga del lienzo).
+La función de referencia es `resolveElement(elemento, valores)`, en `render.ts`. La API valida cada `set` como si fuera el elemento entero (tipos, colores y que no se salga del lienzo).
 
-## 8. Leer y enviar los parámetros
+## 8. Leer y enviar los datos
 
 Las rutas son de la REST de administración. Sirven la sesión de la web o un token `dmt_` con el scope `displays:write`, que se crea en la web, en Tokens. Nunca sirve el token `display:connect` de la pantalla.
 
-**Leer la firma y los valores actuales:**
+**Leer la plantilla activa y los valores actuales:**
 
 ```bash
 curl -s https://atekos.toxolinko.site/api/v1/displays/md-34B7DA01ABCD \
-  -H "Authorization: Bearer $TOKEN" | jq '{params: .template.params, values}'
+  -H "Authorization: Bearer $TOKEN" | jq '{template: .template.id, values}'
 ```
 
 **Enviar valores:**
@@ -293,7 +286,7 @@ curl -X PATCH https://atekos.toxolinko.site/api/v1/displays/md-34B7DA01ABCD/data
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"temp": 32.5, "alarma": true}'
 # → 200 {"values": {...todos los valores...}}
-# → 422 {"error":"invalid_data","issues":[{"path":["temp"],"message":"temp debe ser ≤ 60"}]}
+# → 422 {"error":"invalid_data","issues":[…]}  si un valor no cumple los límites de abajo
 ```
 
 Desde JavaScript (navegador, Node o un script):
@@ -308,8 +301,8 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 
 **Otras formas de enviarlos:**
 
-- **Desde la web:** en el detalle de la pantalla, el formulario «Parámetros» o el editor JSON de «Datos».
-- **Desde una IA:** con las herramientas MCP `get_display` (lee la firma) y `update_display_data` (envía con merge), ver [`../MCP.md`](../MCP.md).
+- **Desde la web:** en el detalle de la pantalla, el editor JSON de «Datos», que muestra encima qué variables usa la plantilla activa.
+- **Desde una IA:** con las herramientas MCP `get_display` (lee la plantilla activa y los valores) y `update_display_data` (envía con merge), ver [`../MCP.md`](../MCP.md).
 - **Desde la propia pantalla:**
   - `local: set_value` cambia un valor solo en esa pantalla.
   - `event: "data.set"` con `payload` cambia los valores en el servidor y en todas las conexiones.
@@ -337,7 +330,7 @@ await fetch(`${API}/api/v1/displays/${deviceId}/data`, {
 
 ## 10. Para quien programa el firmware
 
-Un firmware 1.0 sigue funcionando con plantillas 1.0. Una plantilla con algo nuevo la rechaza con `template.ack ok:false` (y la pantalla conserva la anterior), y los `frag` los ignora. Para soportar la 1.1:
+Un firmware 1.0 sigue funcionando con plantillas 1.0. Una plantilla con algo nuevo la rechaza con `template.ack ok:false` (y la pantalla conserva la anterior), y los `frag` los ignora. Para soportar el contrato actual (1.2):
 
 1. **`device.hello`:**
    - `display.buttons` con el número de botones físicos.
@@ -352,7 +345,7 @@ Un firmware 1.0 sigue funcionando con plantillas 1.0. Una plantilla con algo nue
    - Las Bézier, muestreando unos 16–32 segmentos.
    - Las líneas gruesas, como rectángulos girados o círculos a lo largo del trazo.
 4. **`image`:** decodificar mientras se dibuja, en streaming desde LittleFS, sin cargar toda la imagen en RAM (§4).
-5. **Capa dinámica:** al redibujar, aplicar `withDefaults`, `binds`, `when` y `format` exactamente como `render.ts` (§7.3). No se ejecuta código: todo son comparaciones y sustituciones declarativas.
+5. **Capa dinámica:** al redibujar, aplicar `bind`, `binds`, `when` y `format` con los valores recibidos, exactamente como `render.ts` (§7.3). No se ejecuta código: todo son comparaciones y sustituciones declarativas.
 6. **`animation`:** un temporizador que redibuja con `currentFrame`.
 7. **Botones:**
    - Si la plantilla tiene acciones `trigger: "button"`, esas mandan: corta o larga según `press`, y se resalta su zona.
@@ -360,4 +353,4 @@ Un firmware 1.0 sigue funcionando con plantillas 1.0. Una plantilla con algo nue
    - El `touch.tap` lleva `source`, `button` y `press`.
 8. **`frag`:** reensamblar en LittleFS y responder `frag.ack` (§9).
 
-La lista completa de mensajes con sus campos está en el contrato publicado (`/contrato`).
+La lista completa de mensajes con sus campos está en el contrato publicado (`/contrato`). Las instrucciones paso a paso para el firmware de la placa, con código, están en [`FIRMWARE.md`](FIRMWARE.md).

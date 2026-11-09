@@ -1,5 +1,4 @@
 import {
-	checkParams,
 	currentFrame,
 	decodeBase64,
 	decodeImage,
@@ -8,7 +7,7 @@ import {
 	encodePixels,
 	resolveElement,
 	rgb565,
-	withDefaults,
+	templateVariables,
 	type DisplayElement,
 	type DisplayTemplate,
 } from '@atekos/shared'
@@ -71,17 +70,23 @@ describe('render.ts: capa dinámica de la plantilla', () => {
 		expect([eq('eq', 5), eq('eq', '5'), eq('ne', '5'), eq('falsy', 0)]).toEqual(['sí', 'base', 'sí', 'sí'])
 	})
 
-	it('withDefaults pone los default debajo de los valores; checkParams valida tipo y rango', () => {
-		const t: Pick<DisplayTemplate, 'params'> = {
-			params: { a: { type: 'number', default: 1, min: 0, max: 10 }, b: { type: 'string' } },
+	it('templateVariables: las variables de bind, binds, format y when, también en los fotogramas, sin repetir', () => {
+		const t: Pick<DisplayTemplate, 'elements' | 'animation'> = {
+			elements: [
+				{ type: 'text', x: 1, y: 1, bind: 'a' },
+				{
+					type: 'text',
+					x: 1,
+					y: 1,
+					format: '{b} y {a}',
+					binds: { color: 'c' },
+					when: [{ key: 'd', op: 'truthy', set: { format: '{e}' } }],
+				},
+			],
+			animation: { frames: [{ ms: 100, elements: [{ type: 'progress', x: 1, y: 1, w: 9, h: 9, bind: 'f' }] }] },
 		}
-		expect(withDefaults(t, { b: 'x' })).toEqual({ a: 1, b: 'x' })
-		expect(withDefaults(t, { a: 5 })).toEqual({ a: 5 })
-		expect(checkParams(t.params, { a: 11, b: 3, otra: 'libre', c: null })).toEqual([
-			{ path: ['a'], message: 'a debe ser ≤ 10' },
-			{ path: ['b'], message: 'b debe ser string' },
-		])
-		expect(checkParams(t.params, { a: null })).toEqual([])
+		expect(templateVariables(t)).toEqual(['a', 'c', 'b', 'd', 'e', 'f'])
+		expect(templateVariables({ elements: [{ type: 'text', x: 1, y: 1, value: '{no}' }] })).toEqual([])
 	})
 
 	it('currentFrame recorre los fotogramas y, con repeat, se queda en el último', () => {

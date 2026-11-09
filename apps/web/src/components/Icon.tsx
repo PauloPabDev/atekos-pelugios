@@ -25,6 +25,8 @@ const PATHS = {
 	chevron: 'M9 6l6 6-6 6',
 	logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
 	x: 'M6 6l12 12M18 6L6 18',
+	clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+	calendar: 'M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM4 10h16M8 3v4M16 3v4',
 } as const
 
 export type IconName = keyof typeof PATHS

@@ -23,6 +23,7 @@ it('al arrancar migra PG y crea las colecciones time-series de Mongo', async () 
 		'displays',
 		'oauth_clients',
 		'oauth_grants',
+		'schedules',
 		'users',
 	])
 	const cols = await s.c.mongo.listCollections({ type: 'timeseries' }, { nameOnly: true }).toArray()

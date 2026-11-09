@@ -70,19 +70,12 @@ export const statusTemplate: DisplayTemplate = {
 	actions: [{ id: 'go-back', trigger: 'tap', x: 12, y: 268, w: 148, h: 37, mode: 'remote', event: 'screen.goal.v1' }],
 }
 
-// Ejemplo avanzado de la 1.1: horizontal, formas, curva, imagen, animación, params/binds/when y botones físicos
+// Ejemplo avanzado: horizontal, formas, curva, imagen, animación, variables con bind/binds/format/when y botones físicos
 export const showcaseTemplate: DisplayTemplate = {
 	id: 'showcase.v1',
 	version: 1,
 	rotation: 90,
 	background: '#090D18',
-	params: {
-		temp: { type: 'number', default: 21, min: -20, max: 60, description: 'Temperatura en grados' },
-		nivel: { type: 'number', default: 40, min: 0, max: 100, description: 'Nivel del depósito (0 a 100)' },
-		angulo: { type: 'number', default: 90, min: -90, max: 270, description: 'Final del arco del indicador, en grados' },
-		alarma: { type: 'boolean', default: false, description: 'Muestra el aviso rojo' },
-		estado: { type: 'string', default: 'OK', description: 'Texto de estado' },
-	},
 	elements: [
 		{ type: 'text', x: 10, y: 8, size: 2, color: '#FFFFFF', value: 'PANEL' },
 		{
@@ -199,3 +192,6 @@ export const goalData: DisplayValues = {
 	percentageText: '6.25% COMPLETADO',
 	serverStatus: 'EN LINEA',
 }
+
+// Valores de las variables que usa showcaseTemplate
+export const showcaseData: DisplayValues = { temp: 21, nivel: 40, angulo: 90, alarma: false, estado: 'OK' }

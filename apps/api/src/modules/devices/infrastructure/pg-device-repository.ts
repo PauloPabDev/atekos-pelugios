@@ -75,6 +75,15 @@ export const makePgDeviceRepository = (db: NodePgDatabase): DeviceRepository => 
 				.returning(),
 		)
 	},
+	deleteDataKey(id, key) {
+		return one(
+			db
+				.update(devices)
+				.set({ data: sql`${devices.data} - ${key}::text`, updatedAt: sql`clock_timestamp()` })
+				.where(eq(devices.id, id))
+				.returning(),
+		)
+	},
 	mergeData(id, patch) {
 		return one(
 			db

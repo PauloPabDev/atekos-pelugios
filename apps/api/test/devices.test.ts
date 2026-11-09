@@ -218,6 +218,17 @@ describe('devices', () => {
 			.patch(api(`/devices/${d.id}/data`))
 			.send([1, 2])
 			.expect(400)
+
+		// Quitar una clave: PATCH no puede (solo mezcla)
+		const del = await agent.delete(api(`/devices/${d.id}/data/rgb`)).expect(200)
+		expect(del.body.data).toEqual({ brillo: 80, modo: 'noche' })
+		await agent.delete(api(`/devices/${d.id}/data/rgb`)).expect(404)
+		await agent.delete(api(`/devices/${d.id}/data/constructor`)).expect(404)
+		await anon()
+			.delete(api(`/devices/${d.id}/data/brillo`))
+			.expect(404)
+		const [ev] = (await agent.get(api(`/devices/${d.id}/events`)).expect(200)).body
+		expect(ev).toMatchObject({ type: 'data.changed', after: { data: { brillo: 80, modo: 'noche' } } })
 	})
 
 	it('PATCH de metadatos; eventos del más reciente al más antiguo', async () => {

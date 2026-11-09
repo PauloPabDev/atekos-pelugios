@@ -1,5 +1,4 @@
-import { checkParams, type DisplayServerMessage, type DisplayValues } from '@atekos/shared'
-import { Unprocessable } from '../../../shared/errors'
+import { type DisplayServerMessage, type DisplayValues } from '@atekos/shared'
 import type { Actor } from '../../devices/domain/policy'
 import { activeTemplate, findAdmin, type DisplayDeps } from './access'
 import { assertFits } from './messages'
@@ -11,9 +10,7 @@ export class PutData {
 	async execute(actor: Actor, hardwareId: string, values: DisplayValues) {
 		const { repo, outbox } = this.deps
 		const d = await findAdmin(repo, actor, hardwareId)
-		const { version, params } = await activeTemplate(repo, d)
-		const issues = checkParams(params, values)
-		if (issues.length) throw Unprocessable('invalid_data', 'Datos inválidos', issues)
+		const { version } = await activeTemplate(repo, d)
 		const message: DisplayServerMessage = {
 			type: 'data.update',
 			templateVersion: version,

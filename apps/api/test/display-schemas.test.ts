@@ -82,7 +82,6 @@ describe('esquemas MetaDisplay', () => {
 				{ ...button('b'), press: 'long', x: 0, y: 0, w: 10, h: 10 },
 				{ ...button('c'), button: 15 },
 			],
-			params: { a: { type: 'string', default: 'hola', description: 'Saludo' }, n: { type: 'number', min: 0, max: 9 } },
 		})
 		expect(t.error?.issues ?? []).toEqual([])
 		// sin límite de elementos ni de acciones: manda el tope de bytes
@@ -150,7 +149,6 @@ describe('esquemas MetaDisplay', () => {
 		['dos acciones para el mismo botón y pulsación', { actions: [button('a'), button('b')] }],
 		['un botón 16', { actions: [{ ...button('a'), button: 16 }] }],
 		['un botón con zona a medias', { actions: [{ ...button('a'), x: 1, y: 1 }] }],
-		['un default que no es del tipo del parámetro', { params: { t: { type: 'number', default: 'x' } } }],
 		['un fotograma de 10 ms', { animation: { frames: [{ ms: 10, elements: [] }] } }],
 		['un fotograma con un elemento fuera', { animation: { frames: [{ ms: 100, elements: [{ ...circle, x: 170 }] }] } }],
 		['una rotación de 45', { rotation: 45 }],

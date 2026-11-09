@@ -5,7 +5,7 @@
 **Los esquemas zod de [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts) son el contrato.** De ellos sale todo lo demás:
 
 - Los mensajes del dispositivo: `DisplayClientMessage` (pantalla → servidor) y `DisplayServerMessage` (servidor → pantalla).
-- La plantilla y los datos: `DisplayTemplate` y `DisplayValues`. Desde la 1.1 incluyen rotación, formas, imágenes, animación, botones físicos y parámetros; cómo usarlos se explica en **[`PLANTILLAS.md`](PLANTILLAS.md)**, que también enseña a leer y enviar los parámetros.
+- La plantilla y los datos: `DisplayTemplate` y `DisplayValues`. Desde la 1.1 incluyen rotación, formas, imágenes, animación, botones físicos y funciones sobre las variables de los datos; cómo usarlos se explica en **[`PLANTILLAS.md`](PLANTILLAS.md)**, que también enseña a leer y enviar los datos. Lo que tiene que implementar el firmware de la placa para soportarlos está en **[`FIRMWARE.md`](FIRMWARE.md)**.
 - Los comandos: `DisplayCommand`.
 - Los cuerpos de la REST: `CreateDisplayInput`, `PatchDisplayInput`, `Display`, `DisplayDetail` y `DisplayEvent`.
 

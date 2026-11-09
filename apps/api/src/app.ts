@@ -12,6 +12,7 @@ import { tokenRoutes } from './modules/tokens/infrastructure/http-routes'
 import { deviceRoutes } from './modules/devices/infrastructure/http-routes'
 import { telemetryRoutes } from './modules/telemetry/infrastructure/http-routes'
 import { displayRoutes } from './modules/displays/infrastructure/http-routes'
+import { scheduleRoutes } from './modules/schedules/infrastructure/http-routes'
 import { oauthConsentRoutes, oauthServerRoutes } from './modules/oauth/infrastructure/http-routes'
 import { MCP_PATH } from './modules/oauth/application/provider'
 import { mcpRoutes } from './mcp/http-routes'
@@ -87,6 +88,7 @@ export function buildApp(c: Container) {
 	api.use('/tokens', tokenRoutes(c))
 	api.use(deviceRoutes(c))
 	api.use(telemetryRoutes(c))
+	api.use(scheduleRoutes(c))
 	api.use('/displays', displayRoutes(c))
 	if (c.oauth) api.use('/oauth', oauthConsentRoutes(c.oauth.consent))
 

@@ -3,39 +3,6 @@
   "version": 1,
   "rotation": 90,
   "background": "#090D18",
-  "params": {
-    "temp": {
-      "type": "number",
-      "default": 21,
-      "min": -20,
-      "max": 60,
-      "description": "Temperatura en grados"
-    },
-    "nivel": {
-      "type": "number",
-      "default": 40,
-      "min": 0,
-      "max": 100,
-      "description": "Nivel del depósito (0 a 100)"
-    },
-    "angulo": {
-      "type": "number",
-      "default": 90,
-      "min": -90,
-      "max": 270,
-      "description": "Final del arco del indicador, en grados"
-    },
-    "alarma": {
-      "type": "boolean",
-      "default": false,
-      "description": "Muestra el aviso rojo"
-    },
-    "estado": {
-      "type": "string",
-      "default": "OK",
-      "description": "Texto de estado"
-    }
-  },
   "elements": [
     {
       "type": "text",

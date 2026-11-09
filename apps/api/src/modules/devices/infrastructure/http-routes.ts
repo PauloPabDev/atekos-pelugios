@@ -69,6 +69,10 @@ export function deviceRoutes(c: Container) {
 		res.json(await d.patchData.execute(req.actor, deviceId(req), PatchDataInput.parse(req.body)))
 	})
 
+	r.delete('/devices/:id/data/:key', async (req, res) => {
+		res.json(await d.deleteDataKey.execute(req.actor, deviceId(req), req.params.key))
+	})
+
 	r.get('/devices/:id/events', async (req, res) => {
 		const { limit } = EventsQuery.parse(req.query)
 		res.json(await d.listEvents.execute(req.actor, deviceId(req), limit))

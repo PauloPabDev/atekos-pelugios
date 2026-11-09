@@ -146,3 +146,28 @@ test('apps conectadas: lista los grants y Revocar llama a DELETE y recarga la li
 	expect(fetch).toHaveBeenCalledWith(`/api/v1/oauth/grants/${grant.id}`, expect.objectContaining({ method: 'DELETE' }))
 	expect(list).not.toHaveTextContent('Claude')
 })
+
+test('?pantalla=<id> preselecciona la pantalla, display:connect y un nombre', async () => {
+	const now = new Date().toISOString()
+	const display: Display = {
+		id: crypto.randomUUID(),
+		deviceId: 'md-34B7DA01ABCD',
+		name: 'Meta',
+		activeTemplateId: 'inicio',
+		online: false,
+		createdAt: now,
+		updatedAt: now,
+	}
+	mockFetch({
+		'GET /api/v1/auth/me': () => ({ body: user }),
+		'GET /api/v1/devices': () => ({ body: [] }),
+		'GET /api/v1/displays': () => ({ body: [display] }),
+		'GET /api/v1/tokens': () => ({ body: [] }),
+		'GET /api/v1/oauth/grants': () => ({ body: [] }),
+	})
+	renderApp(`/tokens?pantalla=${display.id}`)
+
+	expect(await screen.findByDisplayValue('Pantalla Meta')).toHaveFocus()
+	expect(screen.getByLabelText(/^Pantalla/)).toHaveValue(display.id)
+	expect(screen.getByLabelText('display:connect')).toBeChecked()
+})

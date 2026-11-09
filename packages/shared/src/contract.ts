@@ -22,7 +22,7 @@ import {
 // Implementa el protocolo oficial (docs/metadisplay/CONTRATO.md, asyncapi.yaml, openapi.yaml) con las
 // diferencias de docs/metadisplay/DISENO.md. Cualquier cambio en el contenido exige subir version y updatedAt:
 // `pnpm contract` se niega a regenerar docs/metadisplay/generado/ si no.
-export const METADISPLAY_CONTRACT = { version: '1.1.0', updatedAt: '2026-11-08', protocol: 1 } as const
+export const METADISPLAY_CONTRACT = { version: '1.2.0', updatedAt: '2026-11-09', protocol: 1 } as const
 
 type Json = Record<string, unknown>
 type Target = 'draft-7' | 'draft-2020-12'
@@ -248,7 +248,7 @@ export function metaDisplayOpenApi(origin: string, maxBytes: number = DISPLAY_MA
 						'200': res('Valores', values),
 						...common,
 						'413': tooLarge,
-						'422': err('Valores inválidos o que no cumplen los params de la plantilla activa (invalid_data)'),
+						'422': err('Valores inválidos'),
 					},
 				},
 				patch: {
@@ -258,7 +258,7 @@ export function metaDisplayOpenApi(origin: string, maxBytes: number = DISPLAY_MA
 						'200': res('Valores', values),
 						...common,
 						'413': tooLarge,
-						'422': err('Valores inválidos, más de 64 claves o que no cumplen los params de la plantilla activa'),
+						'422': err('Valores inválidos o más de 64 claves'),
 					},
 				},
 			},

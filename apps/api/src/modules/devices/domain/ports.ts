@@ -13,6 +13,8 @@ export interface DeviceRepository {
 	setState(id: string, state: boolean): Promise<Device>
 	toggleState(id: string): Promise<Device>
 	mergeData(id: string, patch: Record<string, unknown>): Promise<Device>
+	/** Quita una clave de `data` (sin la clave, no cambia nada salvo `updatedAt`). */
+	deleteDataKey(id: string, key: string): Promise<Device>
 	/** Borra el dispositivo y devuelve los hashes de sus tokens ligados (caen en cascada). */
 	delete(id: string): Promise<string[]>
 }

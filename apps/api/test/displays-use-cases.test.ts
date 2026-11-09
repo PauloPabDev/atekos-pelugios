@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { initialTemplate } from '../src/modules/displays/application/create-display'
 import { fragment } from '../src/modules/displays/application/messages'
 import { PatchData } from '../src/modules/displays/application/patch-data'
-import { PutData } from '../src/modules/displays/application/put-data'
 import { PutTemplate } from '../src/modules/displays/application/put-template'
 import type { Actor } from '../src/modules/devices/domain/policy'
 import type { DisplayOutbox, DisplayRecord, DisplayRepository } from '../src/modules/displays/domain/ports'
@@ -86,37 +85,6 @@ describe('PatchData', () => {
 		await expect(new PatchData(deps).execute(other, hw, { b: 'y' })).rejects.toMatchObject({ status: 404 })
 		expect(repo.mergeValues).not.toHaveBeenCalled()
 		expect(outbox.publish).not.toHaveBeenCalled()
-	})
-})
-
-describe('params de la plantilla activa', () => {
-	const withParams = () => {
-		const f = fakes()
-		f.repo.findTemplate.mockResolvedValue({
-			...initialTemplate('Sala'),
-			params: { temp: { type: 'number', min: -20, max: 60 }, mensaje: { type: 'string' } },
-		})
-		return f
-	}
-
-	it('PATCH con un tipo equivocado → 422 invalid_data con issues, sin escribir ni publicar', async () => {
-		const { repo, outbox, deps } = withParams()
-		const err = await new PatchData(deps).execute(owner, hw, { temp: 'calor' }).catch((e: AppError) => e)
-		expect(err).toMatchObject({ status: 422, code: 'invalid_data', issues: [{ path: ['temp'] }] })
-		expect(repo.mergeValues).not.toHaveBeenCalled()
-		expect(outbox.publish).not.toHaveBeenCalled()
-	})
-
-	it('PUT fuera de min/max → 422; claves no declaradas y null se aceptan', async () => {
-		const { deps } = withParams()
-		const replaceValues = vi.fn(async (_id: string, values: DisplayValues) => ({ ...record, values }))
-		Object.assign(deps.repo, { replaceValues })
-		const put = new PutData(deps)
-		await expect(put.execute(owner, hw, { temp: 61 })).rejects.toMatchObject({ status: 422, code: 'invalid_data' })
-		expect(replaceValues).not.toHaveBeenCalled()
-		await expect(put.execute(owner, hw, { temp: 21, mensaje: null, otra: true })).resolves.toEqual({
-			values: { temp: 21, mensaje: null, otra: true },
-		})
 	})
 })
 

@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { decodeImage, IMAGE_ENCODINGS } from './image'
-import { checkParams, withDefaults } from './render'
 
 // ---------- Scopes ----------
 
@@ -89,7 +88,8 @@ export const DeviceEvent = z.object({
 	before: Device.nullable(),
 	after: Device.nullable(),
 	actor: z.object({ kind: z.enum(['anonymous', 'user', 'token']), id: z.string().nullable() }),
-	source: z.enum(['http', 'ws']),
+	// schedule: lo hizo un programa del dueño (actor = el dueño)
+	source: z.enum(['http', 'ws', 'schedule']),
 })
 export type DeviceEvent = z.infer<typeof DeviceEvent>
 
@@ -517,18 +517,6 @@ export const DisplayTouchAction = z
 	})
 export type DisplayTouchAction = z.infer<typeof DisplayTouchAction>
 
-// Firma de la plantilla: qué variables espera, de qué tipo y con qué valor por defecto.
-export const DisplayParam = z
-	.object({
-		type: z.enum(['number', 'string', 'boolean']),
-		default: Scalar.optional(),
-		description: z.string().max(140).optional(),
-		min: z.number().optional(),
-		max: z.number().optional(),
-	})
-	.refine((p) => p.min === undefined || p.max === undefined || p.min <= p.max, { message: 'min > max' })
-export type DisplayParam = z.infer<typeof DisplayParam>
-
 // Fotograma: se dibuja encima de los `elements` de la plantilla durante `ms`.
 const DisplayFrame = z.object({ ms: z.number().int().min(20).max(60_000), elements: z.array(DisplayElement) })
 
@@ -538,10 +526,6 @@ export const DisplayTemplate = z
 		version: z.number().int().min(0).max(2_147_483_647), // integer en PG: más allá, el INSERT daría un 500
 		rotation: z.literal([0, 90, 180, 270]).optional(),
 		background: Color.optional(),
-		params: z
-			.record(ValueKey, DisplayParam)
-			.refine((p) => Object.keys(p).length <= 64, { message: 'máximo 64 parámetros' })
-			.optional(),
 		elements: z.array(DisplayElement),
 		// repeat 0 (o ausente) = siempre; al acabar las vueltas se queda en el último fotograma
 		animation: z
@@ -567,8 +551,6 @@ export const DisplayTemplate = z
 		if (new Set(t.actions.map((a) => a.id)).size !== t.actions.length) issue('ids de acción repetidos', ['actions'])
 		const presses = t.actions.flatMap((a) => (a.trigger === 'button' ? [`${a.button}:${a.press ?? 'short'}`] : []))
 		if (new Set(presses).size !== presses.length) issue('dos acciones para el mismo botón y pulsación', ['actions'])
-		for (const p of checkParams(t.params, withDefaults(t, {})))
-			issue(`default inválido: ${p.message}`, ['params', ...p.path])
 	})
 export type DisplayTemplate = z.infer<typeof DisplayTemplate>
 
@@ -713,3 +695,4 @@ export type DisplayServerMessage = z.infer<typeof DisplayServerMessage>
 
 export * from './image'
 export * from './render'
+export * from './schedule'

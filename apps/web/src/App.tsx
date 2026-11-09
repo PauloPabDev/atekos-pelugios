@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import type { User } from '@atekos/shared'
 import * as api from './api'
 import { BrandMark, Icon, type IconName } from './components/Icon'
@@ -8,9 +8,22 @@ import { Login, Register } from './pages/Auth'
 import { Authorize } from './pages/Authorize'
 import { Contract } from './pages/Contract'
 import { Devices } from './pages/Devices'
-import { DeviceDetail } from './pages/DeviceDetail'
+import { DeviceActivity } from './pages/device/DeviceActivity'
+import { DeviceData } from './pages/device/DeviceData'
+import { DeviceLayout } from './pages/device/DeviceLayout'
+import { DeviceLive } from './pages/device/DeviceLive'
+import { DeviceSchedules } from './pages/device/DeviceSchedules'
+import { DeviceSettings } from './pages/device/DeviceSettings'
 import { Displays } from './pages/Displays'
-import { DisplayDetail } from './pages/DisplayDetail'
+import { DisplayActivity } from './pages/display/DisplayActivity'
+import { DisplayData } from './pages/display/DisplayData'
+import { DisplayLayout } from './pages/display/DisplayLayout'
+import { DisplayLive } from './pages/display/DisplayLive'
+import { DisplaySchedules } from './pages/display/DisplaySchedules'
+import { DisplaySettings } from './pages/display/DisplaySettings'
+import { DisplayTemplates } from './pages/display/DisplayTemplates'
+import { TemplateEditor } from './pages/display/TemplateEditor'
+import { Schedules } from './pages/Schedules'
 import { Tokens } from './pages/Tokens'
 import { PublicDevice } from './pages/PublicDevice'
 
@@ -26,9 +39,30 @@ export function App() {
 			</Route>
 			<Route element={<Session />}>
 				<Route index element={<Devices />} />
-				<Route path="/devices/:id" element={<DeviceDetail />} />
+				{/* Cada detalle es un layout (cabecera + pestañas) y cada pestaña, una ruta */}
+				<Route path="/devices/:id" element={<DeviceLayout />}>
+					<Route index element={<DeviceLive />} />
+					<Route path="datos" element={<DeviceData />} />
+					<Route path="programas" element={<DeviceSchedules />} />
+					<Route path="programas/nuevo" element={<DeviceSchedules />} />
+					<Route path="programas/:scheduleId" element={<DeviceSchedules />} />
+					<Route path="actividad" element={<DeviceActivity />} />
+					<Route path="ajustes" element={<DeviceSettings />} />
+				</Route>
 				<Route path="/displays" element={<Displays />} />
-				<Route path="/displays/:deviceId" element={<DisplayDetail />} />
+				<Route path="/displays/:deviceId" element={<DisplayLayout />}>
+					<Route index element={<DisplayLive />} />
+					<Route path="datos" element={<DisplayData />} />
+					<Route path="plantillas" element={<DisplayTemplates />} />
+					<Route path="plantillas/nueva" element={<TemplateEditor />} />
+					<Route path="plantillas/:templateId" element={<TemplateEditor />} />
+					<Route path="programas" element={<DisplaySchedules />} />
+					<Route path="programas/nuevo" element={<DisplaySchedules />} />
+					<Route path="programas/:scheduleId" element={<DisplaySchedules />} />
+					<Route path="actividad" element={<DisplayActivity />} />
+					<Route path="ajustes" element={<DisplaySettings />} />
+				</Route>
+				<Route path="/programas" element={<Schedules />} />
 				<Route path="/tokens" element={<Tokens />} />
 				<Route path="/autorizar" element={<Authorize />} />
 			</Route>
@@ -39,6 +73,7 @@ export function App() {
 const TABS: [to: string, label: string, icon: IconName][] = [
 	['/', 'Dispositivos', 'bulb'],
 	['/displays', 'Pantallas', 'screen'],
+	['/programas', 'Programas', 'clock'],
 	['/tokens', 'Tokens', 'key'],
 	['/contrato', 'Contrato', 'doc'],
 ]
@@ -56,6 +91,8 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 	})
 	const tabs = !!user && nav
 	const { pathname } = useLocation()
+	// El editor de plantillas es una tarea enfocada: en el móvil sin pestañas abajo, y su barra de guardar ocupa su sitio
+	const editor = !!useMatch('/displays/:deviceId/plantillas/:templateId')
 
 	return (
 		<div className={tabs ? 'min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]' : 'min-h-dvh'}>
@@ -70,7 +107,7 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 				{tabs && (
 					<nav
 						aria-label="Principal"
-						className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:static lg:flex lg:flex-col lg:gap-0.5 lg:border-0 lg:p-0"
+						className={`fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:static lg:flex lg:flex-col lg:gap-0.5 lg:border-0 lg:p-0 ${editor ? 'max-lg:hidden' : ''}`}
 					>
 						{TABS.map(([to, label, icon]) => (
 							<NavLink
@@ -122,7 +159,9 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 					)}
 				</div>
 			</header>
-			<main className={`mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10 ${tabs ? 'pb-28 lg:pb-12' : ''}`}>
+			<main
+				className={`mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10 ${tabs ? (editor ? 'lg:pb-12' : 'pb-28 lg:pb-12') : ''}`}
+			>
 				{logout.error && (
 					<p role="alert" className="alert alert-error mb-4">
 						{logout.error.message}

@@ -2,9 +2,9 @@
 	"asyncapi": "3.0.0",
 	"info": {
 		"title": "MetaDisplay en atekos-pelugios",
-		"version": "1.1.0",
+		"version": "1.2.0",
 		"description": "Protocolo MetaDisplay 1 sobre WSS: JSON UTF-8 en tramas de texto de hasta 8192 bytes; un mensaje mayor (hasta 1048576 bytes) llega troceado en frag. Lienzo de 172×320 en vertical o 320×172 con template.rotation 90/270. El token va solo en la cabecera Authorization del upgrade (nunca en la query). Guía de plantillas: docs/metadisplay/PLANTILLAS.md.",
-		"x-updated": "2026-11-08",
+		"x-updated": "2026-11-09",
 		"x-protocol": 1,
 		"x-max-frame-bytes": 8192,
 		"x-max-message-bytes": 1048576
@@ -479,57 +479,6 @@
 								"background": {
 									"type": "string",
 									"pattern": "^#[0-9a-fA-F]{6}$"
-								},
-								"params": {
-									"type": "object",
-									"propertyNames": {
-										"type": "string",
-										"minLength": 1,
-										"maxLength": 40
-									},
-									"additionalProperties": {
-										"type": "object",
-										"properties": {
-											"type": {
-												"type": "string",
-												"enum": [
-													"number",
-													"string",
-													"boolean"
-												]
-											},
-											"default": {
-												"anyOf": [
-													{
-														"type": "string",
-														"maxLength": 140
-													},
-													{
-														"type": "number"
-													},
-													{
-														"type": "boolean"
-													},
-													{
-														"type": "null"
-													}
-												]
-											},
-											"description": {
-												"type": "string",
-												"maxLength": 140
-											},
-											"min": {
-												"type": "number"
-											},
-											"max": {
-												"type": "number"
-											}
-										},
-										"required": [
-											"type"
-										]
-									}
 								},
 								"elements": {
 									"type": "array",

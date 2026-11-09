@@ -28,7 +28,7 @@ import { ListDevices } from './modules/devices/application/list-devices'
 import { ListEvents } from './modules/devices/application/list-events'
 import { ListPublicDevices } from './modules/devices/application/list-public-devices'
 import { makeOnDeviceChanged } from './modules/devices/application/on-device-changed'
-import { PatchData } from './modules/devices/application/patch-data'
+import { DeleteDataKey, PatchData } from './modules/devices/application/patch-data'
 import { PatchDevice } from './modules/devices/application/patch-device'
 import { SetState } from './modules/devices/application/set-state'
 import { ToggleState } from './modules/devices/application/toggle-state'
@@ -57,6 +57,9 @@ import { IngestTelemetry } from './modules/telemetry/application/ingest-telemetr
 import { QueryTelemetry } from './modules/telemetry/application/query-telemetry'
 import { makeMongoTelemetryRepository } from './modules/telemetry/infrastructure/mongo-telemetry-repository'
 import { OAuthConsent } from './modules/oauth/application/consent'
+import { CreateSchedule, DeleteSchedule, ListSchedules, PatchSchedule } from './modules/schedules/application/schedules'
+import { RunDueSchedules } from './modules/schedules/application/run-due-schedules'
+import { makePgScheduleRepository } from './modules/schedules/infrastructure/pg-schedule-repository'
 import { makeOAuthProvider } from './modules/oauth/application/provider'
 import { makePgOAuthRepository } from './modules/oauth/infrastructure/pg-oauth-repository'
 import { makeRedisOAuthStore } from './modules/oauth/infrastructure/redis-oauth-store'
@@ -107,6 +110,12 @@ export async function createContainer(env: Env, logger: Logger) {
 
 	const od = { repo: makePgOAuthRepository(db), store: makeRedisOAuthStore(redis), hasher }
 
+	// Compartidos con los programas, que actúan por los mismos casos de uso que la API
+	const setState = new SetState({ repo: deviceRepo, onChanged })
+	const toggle = new ToggleState({ repo: deviceRepo, onChanged })
+	const sendCommand = new SendCommand(dd)
+	const sd = { repo: makePgScheduleRepository(db), devices: deviceRepo, displays: dd.repo }
+
 	return {
 		env,
 		logger,
@@ -135,10 +144,11 @@ export async function createContainer(env: Env, logger: Logger) {
 			list: new ListDevices({ repo: deviceRepo }),
 			listPublic: new ListPublicDevices({ repo: deviceRepo }),
 			getState: new GetState({ repo: deviceRepo, cache }),
-			setState: new SetState({ repo: deviceRepo, onChanged }),
-			toggle: new ToggleState({ repo: deviceRepo, onChanged }),
+			setState,
+			toggle,
 			patch: new PatchDevice({ repo: deviceRepo, onChanged }),
 			patchData: new PatchData({ repo: deviceRepo, onChanged }),
+			deleteDataKey: new DeleteDataKey({ repo: deviceRepo, onChanged }),
 			getDataKey: new GetDataKey({ get: getDevice }),
 			listEvents: new ListEvents({ get: getDevice, eventLog }),
 			delete: new DeleteDevice({ repo: deviceRepo, cache, eventLog, redis, logger }),
@@ -158,7 +168,7 @@ export async function createContainer(env: Env, logger: Logger) {
 			putData: new PutData(dd),
 			patchData: new PatchDisplayData(dd),
 			listEvents: new ListDisplayEvents(dd),
-			sendCommand: new SendCommand(dd),
+			sendCommand,
 		},
 		// OAuth y MCP (docs/MCP.md): sin PUBLIC_URL no hay issuer, así que no se montan.
 		oauth: env.PUBLIC_URL
@@ -168,6 +178,13 @@ export async function createContainer(env: Env, logger: Logger) {
 					consent: new OAuthConsent(od),
 				}
 			: null,
+		schedules: {
+			list: new ListSchedules(sd),
+			create: new CreateSchedule(sd),
+			patch: new PatchSchedule(sd),
+			delete: new DeleteSchedule(sd),
+			runDue: new RunDueSchedules({ repo: sd.repo, setState, toggle, sendCommand, logger }),
+		},
 		telemetry: {
 			ingest: new IngestTelemetry({ get: getDevice, repo: telemetryRepo }),
 			query: new QueryTelemetry({ get: getDevice, repo: telemetryRepo }),
