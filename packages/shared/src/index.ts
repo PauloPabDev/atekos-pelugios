@@ -517,41 +517,48 @@ export const DisplayTouchAction = z
 	})
 export type DisplayTouchAction = z.infer<typeof DisplayTouchAction>
 
-// Fotograma: se dibuja encima de los `elements` de la plantilla durante `ms`.
-const DisplayFrame = z.object({ ms: z.number().int().min(20).max(60_000), elements: z.array(DisplayElement) })
-
-export const DisplayTemplate = z
-	.object({
-		id: z.string().min(1).max(64),
-		version: z.number().int().min(0).max(2_147_483_647), // integer en PG: más allá, el INSERT daría un 500
-		rotation: z.literal([0, 90, 180, 270]).optional(),
-		background: Color.optional(),
-		elements: z.array(DisplayElement),
-		// repeat 0 (o ausente) = siempre; al acabar las vueltas se queda en el último fotograma
-		animation: z
-			.object({ frames: z.array(DisplayFrame).min(1), repeat: z.number().int().min(0).optional() })
-			.optional(),
-		actions: z.array(DisplayTouchAction),
-	})
-	.superRefine((t, ctx) => {
-		const { width, height } = displaySize(t.rotation)
-		const issue = (message: string, path: PropertyKey[]) => ctx.addIssue({ code: 'custom', message, path })
-		const fits = ([x0, y0, x1, y1]: number[]) => x0! >= 0 && y0! >= 0 && x1! <= width && y1! <= height
-		const out = `se sale de ${width}×${height}`
-		const check = (elements: DisplayElement[], path: PropertyKey[]) =>
-			elements.forEach((e, i) => {
-				if (!variants(e).every((v) => fits(extent(v)))) issue(`el elemento ${out}`, [...path, i])
-			})
-		check(t.elements, ['elements'])
-		t.animation?.frames.forEach((f, i) => check(f.elements, ['animation', 'frames', i, 'elements']))
-		t.actions.forEach((a, i) => {
-			if (a.x !== undefined && !fits([a.x, a.y!, a.x + a.w!, a.y! + a.h!]))
-				issue(`la zona de la acción ${out}`, ['actions', i])
+// Campos de la plantilla con el esquema de elemento dado: el validado (DisplayElement) o el estructural.
+const templateFields = (element: typeof ElementUnion) => ({
+	id: z.string().min(1).max(64),
+	version: z.number().int().min(0).max(2_147_483_647), // integer en PG: más allá, el INSERT daría un 500
+	rotation: z.literal([0, 90, 180, 270]).optional(),
+	background: Color.optional(),
+	elements: z.array(element),
+	// Fotogramas: se dibujan encima de `elements` durante `ms`.
+	// repeat 0 (o ausente) = siempre; al acabar las vueltas se queda en el último fotograma
+	animation: z
+		.object({
+			frames: z.array(z.object({ ms: z.number().int().min(20).max(60_000), elements: z.array(element) })).min(1),
+			repeat: z.number().int().min(0).optional(),
 		})
-		if (new Set(t.actions.map((a) => a.id)).size !== t.actions.length) issue('ids de acción repetidos', ['actions'])
-		const presses = t.actions.flatMap((a) => (a.trigger === 'button' ? [`${a.button}:${a.press ?? 'short'}`] : []))
-		if (new Set(presses).size !== presses.length) issue('dos acciones para el mismo botón y pulsación', ['actions'])
+		.optional(),
+	actions: z.array(DisplayTouchAction),
+})
+
+// Los mismos campos y tipos sin las comprobaciones semánticas (píxeles de las imágenes, lienzo, binds, when…).
+// El MCP la usa de inputSchema: sus imágenes pueden llegar por referencia («ref:…») y valida con DisplayTemplate
+// después de resolverlas.
+export const DisplayTemplateShape = z.object(templateFields(ElementUnion))
+
+export const DisplayTemplate = z.object(templateFields(DisplayElement)).superRefine((t, ctx) => {
+	const { width, height } = displaySize(t.rotation)
+	const issue = (message: string, path: PropertyKey[]) => ctx.addIssue({ code: 'custom', message, path })
+	const fits = ([x0, y0, x1, y1]: number[]) => x0! >= 0 && y0! >= 0 && x1! <= width && y1! <= height
+	const out = `se sale de ${width}×${height}`
+	const check = (elements: DisplayElement[], path: PropertyKey[]) =>
+		elements.forEach((e, i) => {
+			if (!variants(e).every((v) => fits(extent(v)))) issue(`el elemento ${out}`, [...path, i])
+		})
+	check(t.elements, ['elements'])
+	t.animation?.frames.forEach((f, i) => check(f.elements, ['animation', 'frames', i, 'elements']))
+	t.actions.forEach((a, i) => {
+		if (a.x !== undefined && !fits([a.x, a.y!, a.x + a.w!, a.y! + a.h!]))
+			issue(`la zona de la acción ${out}`, ['actions', i])
 	})
+	if (new Set(t.actions.map((a) => a.id)).size !== t.actions.length) issue('ids de acción repetidos', ['actions'])
+	const presses = t.actions.flatMap((a) => (a.trigger === 'button' ? [`${a.button}:${a.press ?? 'short'}`] : []))
+	if (new Set(presses).size !== presses.length) issue('dos acciones para el mismo botón y pulsación', ['actions'])
+})
 export type DisplayTemplate = z.infer<typeof DisplayTemplate>
 
 // REST

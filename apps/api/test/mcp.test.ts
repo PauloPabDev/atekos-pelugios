@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { decodeImage, rgb565, type DisplayTemplate } from '@atekos/shared'
 import { METADISPLAY_CONTRACT } from '@atekos/shared/contract'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { PNG } from 'pngjs'
 import { connect, registeredUser } from './oauth-helpers'
 import { startStack } from './stack'
 
@@ -17,6 +19,13 @@ afterAll(() => s?.stop())
 const status = JSON.parse(
 	readFileSync(new URL('../../../docs/metadisplay/examples/status-template.json', import.meta.url), 'utf8'),
 )
+
+// PNG de w×h en base64, con el color RGBA de cada píxel.
+function png(w: number, h: number, color: (x: number, y: number) => number[]) {
+	const p = new PNG({ width: w, height: h })
+	for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) p.data.set(color(x, y), (y * w + x) * 4)
+	return PNG.sync.write(p).toString('base64')
+}
 
 async function mcp(token: string) {
 	const client = new Client({ name: 'test', version: '1.0.0' })
@@ -60,15 +69,22 @@ describe('mcp', () => {
 		expect(tools).toEqual([
 			'create_device',
 			'create_display',
+			'delete_display_template',
 			'get_device',
 			'get_display',
 			'get_display_contract',
+			'get_display_guide',
+			'get_display_template',
 			'list_devices',
+			'list_display_events',
 			'list_displays',
+			'send_display_command',
 			'set_device_state',
 			'set_display_template',
 			'update_device_data',
+			'update_display',
 			'update_display_data',
+			'upload_display_image',
 		])
 
 		// El contrato MetaDisplay, como herramienta y como recurso, con el origen de este despliegue.
@@ -77,7 +93,11 @@ describe('mcp', () => {
 		expect(contract.servers).toEqual({ atekos: expect.objectContaining({ host: new URL(s.url).host, protocol: 'ws' }) })
 		expect((await call('get_display_contract', { part: 'openapi' })).body.openapi).toBe('3.1.0')
 		const resources = (await client.listResources()).resources.map((r) => r.uri).sort()
-		expect(resources).toEqual(['atekos://contract/asyncapi.json', 'atekos://contract/openapi.json'])
+		expect(resources).toEqual([
+			'atekos://contract/asyncapi.json',
+			'atekos://contract/openapi.json',
+			'atekos://guide/pantallas.md',
+		])
 		const res = await client.readResource({ uri: 'atekos://contract/asyncapi.json' })
 		expect(JSON.parse((res.contents[0] as { text: string }).text).asyncapi).toBe('3.0.0')
 
@@ -129,5 +149,138 @@ describe('mcp', () => {
 		const [grant] = (await agent.get('/api/v1/oauth/grants').expect(200)).body
 		await agent.delete(`/api/v1/oauth/grants/${grant.id}`).expect(204)
 		await expect(client.listTools()).rejects.toThrow()
+	})
+
+	it('pantallas: imágenes por referencia, guardar sin activar, datos, comandos, eventos, borrado y guía', async () => {
+		const { agent } = await registeredUser(s.url)
+		const { client, call } = await mcp((await connect(s.url, agent)).access_token)
+		const deviceId = 'md-0000000000A1'
+		await call('create_display', { deviceId, name: 'Taller' })
+		const rest = async () => (await agent.get(`/api/v1/displays/${deviceId}`).expect(200)).body
+
+		// Subida en base64: un PNG de 400×200, rojo a la izquierda y azul a la derecha, encajado en 4×2 con fill.
+		// Con ruido en los 2 bits bajos (que RGB565 descarta) para que pase de los 32 KB del resto de la API.
+		const n = () => Math.floor(Math.random() * 4)
+		const noisy = png(400, 200, (x) => (x < 200 ? [255 - n(), n(), n(), 255] : [n(), n(), 255 - n(), 255]))
+		expect(noisy.length).toBeGreaterThan(32 * 1024)
+		const up = await call('upload_display_image', { deviceId, base64: noisy, width: 4, height: 2, fit: 'fill' })
+		expect(up).toMatchObject({ isError: false, body: { ref: expect.stringMatching(/^ref:[0-9a-f]{16}$/) } })
+		const { ref, element } = up.body as { ref: string; element: Record<string, unknown> }
+		expect(element).toMatchObject({ type: 'image', x: 0, y: 0, w: 4, h: 2, data: ref })
+
+		const template = (version: number, data = ref) => ({
+			id: 'foto',
+			version,
+			elements: [
+				{ ...element, x: 10, y: 20, data },
+				{ type: 'text', x: 10, y: 40, format: 'Temp: {temp} C' },
+			],
+			actions: [],
+		})
+		const saved = await call('set_display_template', { deviceId, template: template(1) })
+		expect(saved).toMatchObject({ isError: false, body: { activeTemplateId: 'foto', variables: ['temp'] } })
+		expect((saved.body.template as DisplayTemplate).elements[0]).toMatchObject({ data: ref })
+		// En la BD están los píxeles reales, no la referencia.
+		const stored = (await rest()).template.elements[0]
+		const px = decodeImage(stored.encoding, stored.data, 4, 2)!
+		const color = (c: number) => (c === rgb565(255, 0, 0) ? 'R' : c === rgb565(0, 0, 255) ? 'B' : '?')
+		expect([...px].map(color).join('')).toBe('RRBBRRBB')
+
+		// get → set conserva la imagen; una referencia desconocida da unknown_image_ref.
+		const detail = await call('get_display', { deviceId })
+		expect(detail.body).toMatchObject({
+			info: null,
+			lastSeenAt: null,
+			template: { elements: [{ data: ref }, { type: 'text' }] },
+		})
+		const got = await call('get_display_template', { deviceId })
+		expect(got.body).toMatchObject({ id: 'foto', elements: [{ data: ref }, { type: 'text' }] })
+		await call('set_display_template', { deviceId, template: { ...got.body, version: 2 } })
+		expect((await rest()).template).toMatchObject({ version: 2, elements: [{ data: stored.data }, { type: 'text' }] })
+		const unknown = await call('set_display_template', { deviceId, template: template(3, 'ref:0000000000000000') })
+		expect(unknown).toMatchObject({ isError: true, body: { error: 'unknown_image_ref' } })
+		const wrong = await call('set_display_template', {
+			deviceId,
+			template: { ...template(3), elements: [{ ...element, w: 5 }] },
+		})
+		expect(wrong).toMatchObject({ isError: true, body: { error: 'invalid_template' } })
+
+		// activate:false guarda sin cambiar la activa; update_display la activa y renombra.
+		const other = { id: 'otra', version: 1, elements: [{ type: 'text', x: 0, y: 0, bind: 'msg' }], actions: [] }
+		const kept = await call('set_display_template', { deviceId, template: other, activate: false })
+		expect(kept.body).toMatchObject({
+			activeTemplateId: 'foto',
+			templates: [{ id: 'foto' }, { id: 'inicio' }, { id: 'otra' }],
+		})
+		expect((await call('get_display_template', { deviceId, templateId: 'otra' })).body).toMatchObject({ id: 'otra' })
+		expect((await call('get_display_template', { deviceId, templateId: 'no' })).body).toMatchObject({
+			error: 'not_found',
+		})
+		const patched = await call('update_display', { deviceId, name: 'Taller 2', activeTemplateId: 'otra' })
+		expect(patched.body).toMatchObject({ name: 'Taller 2', activeTemplateId: 'otra' })
+
+		// Borrar: la activa no (409); otra sí.
+		expect(await call('delete_display_template', { deviceId, templateId: 'otra' })).toMatchObject({
+			isError: true,
+			body: { error: 'conflict' },
+		})
+		expect((await call('delete_display_template', { deviceId, templateId: 'inicio' })).body).toEqual({ ok: true })
+
+		// Datos: merge por defecto; replace sustituye todos.
+		await call('update_display_data', { deviceId, values: { temp: 20, msg: 'hola' } })
+		expect((await call('update_display_data', { deviceId, values: { temp: 21 } })).body).toEqual({
+			values: { temp: 21, msg: 'hola' },
+		})
+		expect((await call('update_display_data', { deviceId, values: { msg: 'solo' }, replace: true })).body).toEqual({
+			values: { msg: 'solo' },
+		})
+
+		// Comandos: sin conexión → device_offline.
+		const cmd = await call('send_display_command', { deviceId, command: { type: 'display.brightness', percent: 30 } })
+		expect(cmd).toMatchObject({ isError: true, body: { error: 'device_offline' } })
+
+		// Eventos: del más reciente al más antiguo, con limit.
+		const { id: displayId, ownerId } = (await s.c.displays.repo.findByHardwareId(deviceId))!
+		for (const eventId of ['e1', 'e2'])
+			await s.c.displays.eventLog.appendTouch({
+				displayId,
+				ownerId,
+				eventId,
+				actionId: 'ir',
+				name: null,
+				x: 0,
+				y: 0,
+				templateId: 'otra',
+				templateVersion: 1,
+				status: 'ok',
+				toast: 'Accion recibida',
+				source: 'button',
+				button: 0,
+				press: 'short',
+			})
+		const events = await call('list_display_events', { deviceId, limit: 1 })
+		expect(events.body).toEqual([expect.objectContaining({ eventId: 'e2', source: 'button' })])
+
+		// Subidas inválidas.
+		const both = await call('upload_display_image', {
+			deviceId,
+			base64: noisy,
+			url: 'https://x.example/a.png',
+			width: 4,
+			height: 2,
+		})
+		expect(both.body).toMatchObject({ error: 'invalid_input' })
+		const huge = await call('upload_display_image', { deviceId, base64: noisy, width: 320, height: 320 })
+		expect(huge.body).toMatchObject({ error: 'invalid_size' })
+		const notImage = await call('upload_display_image', { deviceId, base64: 'aG9sYQ==', width: 4, height: 2 })
+		expect(notImage.body).toMatchObject({ error: 'unsupported_image' })
+		const local = await call('upload_display_image', { deviceId, url: 'https://127.0.0.1/a.png', width: 4, height: 2 })
+		expect(local.body).toMatchObject({ error: 'forbidden_url' })
+
+		// La guía, como herramienta y como recurso.
+		const guide = await call('get_display_guide')
+		expect(guide.text).toContain('# Pantallas MetaDisplay')
+		const res = await client.readResource({ uri: 'atekos://guide/pantallas.md' })
+		expect((res.contents[0] as { text: string }).text).toBe(guide.text)
 	})
 })
