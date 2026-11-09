@@ -120,7 +120,11 @@ export function EventRow({
 				<p className="min-w-0 text-sm break-words text-fg sm:flex-1">{eventText(ev)}</p>
 				<p className="text-sm text-fg-muted sm:w-44 sm:shrink-0 sm:truncate">{whoText(ev, tokens)}</p>
 			</div>
-			<time dateTime={ev.ts} title={fullDate(ev.ts)} className="shrink-0 pt-px text-xs text-fg-subtle">
+			<time
+				dateTime={ev.ts}
+				title={fullDate(ev.ts)}
+				className="shrink-0 pt-px text-xs text-fg-subtle sm:w-24 sm:text-right"
+			>
 				{ago(ev.ts, now)}
 			</time>
 		</li>
