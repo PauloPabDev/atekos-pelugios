@@ -1,12 +1,8 @@
-import { EmptyState } from '../../components/ui'
+import { SchedulesTab } from '../schedules/SchedulesTab'
 import { useDisplay } from './DisplayLayout'
 
-// Esqueleto: sirve las rutas programas, programas/nuevo y programas/:scheduleId hasta que llegue la lista (§6)
+// Sirve programas, programas/nuevo y programas/:scheduleId (§6); el destino es el id de hardware (md-…)
 export function DisplaySchedules() {
 	const { display } = useDisplay()
-	return (
-		<EmptyState icon="clock" title="Pronto">
-			Podrás programar el brillo y el refresco de «{display.name}» a la hora que quieras.
-		</EmptyState>
-	)
+	return <SchedulesTab target={{ kind: 'display', id: display.deviceId }} name={display.name} />
 }

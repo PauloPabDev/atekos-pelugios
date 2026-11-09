@@ -73,6 +73,7 @@ export function App() {
 const TABS: [to: string, label: string, icon: IconName][] = [
 	['/', 'Dispositivos', 'bulb'],
 	['/displays', 'Pantallas', 'screen'],
+	['/programas', 'Programas', 'clock'],
 	['/tokens', 'Tokens', 'key'],
 	['/contrato', 'Contrato', 'doc'],
 ]
@@ -106,7 +107,7 @@ function Shell({ user, nav = true }: { user?: User; nav?: boolean }) {
 				{tabs && (
 					<nav
 						aria-label="Principal"
-						className={`fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:static lg:flex lg:flex-col lg:gap-0.5 lg:border-0 lg:p-0 ${editor ? 'max-lg:hidden' : ''}`}
+						className={`fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:static lg:flex lg:flex-col lg:gap-0.5 lg:border-0 lg:p-0 ${editor ? 'max-lg:hidden' : ''}`}
 					>
 						{TABS.map(([to, label, icon]) => (
 							<NavLink
