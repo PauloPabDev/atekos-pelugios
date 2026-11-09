@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 import { CreateTokenInput, SCOPES, type ApiToken, type Scope } from '@atekos/shared'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
@@ -174,6 +175,19 @@ export function Tokens() {
 			},
 		})
 	}
+
+	// Desde los ajustes de una pantalla (?pantalla=<id>): el atajo de pantalla con ella ya elegida, una sola vez
+	const pantalla = useSearchParams()[0].get('pantalla')
+	const preset = useRef(false)
+	useEffect(() => {
+		const d = displays.data?.find((x) => x.id === pantalla)
+		if (!d || preset.current || !displaySelect.current || !nameInput.current) return
+		preset.current = true
+		displaySelect.current.value = d.id
+		if (!nameInput.current.value) nameInput.current.value = `Pantalla ${d.name}`
+		setScopes(['display:connect'])
+		nameInput.current.focus()
+	}, [displays.data, pantalla])
 
 	const forDisplay = () => {
 		setScopes(['display:connect'])
