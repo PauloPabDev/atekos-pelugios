@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { CreateDisplayInput } from '@atekos/shared'
 import * as api from '../api'
+import { Icon } from '../components/Icon'
 import { Problems } from '../components/Problems'
+import '../styles/displays.css'
 
 export function Online({ online }: { online: boolean }) {
-	return <span className={`state ${online ? 'on' : 'off'}`}>{online ? 'En línea' : 'Sin conexión'}</span>
+	return <span className={online ? 'state on live' : 'state off'}>{online ? 'En línea' : 'Sin conexión'}</span>
 }
 
 export function Displays() {
@@ -18,6 +20,7 @@ export function Displays() {
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['displays'] }),
 	})
 	const [invalid, setInvalid] = useState<string[]>([])
+	const count = displays.data?.length ?? 0
 
 	const onSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
@@ -30,33 +33,64 @@ export function Displays() {
 
 	return (
 		<>
-			<h1>Mis pantallas</h1>
-			{displays.isPending && <p>Cargando…</p>}
+			<div className="page-head">
+				<h1>Mis pantallas</h1>
+				{/* Sin pantallas, la acción la lleva el bloque vacío */}
+				{count > 0 && (
+					<>
+						<span className="chip">{count === 1 ? '1 pantalla' : `${count} pantallas`}</span>
+						<a href="#nueva" className="button primary">
+							<Icon name="plus" />
+							Nueva
+						</a>
+					</>
+				)}
+			</div>
+			{displays.isPending && <p className="loading">Cargando…</p>}
 			<Problems lines={api.errorLines(displays.error)} />
-			{displays.data?.length === 0 && <p className="muted">Todavía no tienes pantallas. Registra la primera abajo.</p>}
+			{displays.data?.length === 0 && (
+				<div className="empty">
+					<span className="tile violet">
+						<Icon name="screen" />
+					</span>
+					<p>
+						<strong>Todavía no tienes pantallas.</strong>
+					</p>
+					<p className="muted">Regístrala con su id y un nombre para editar lo que muestra.</p>
+					<a href="#nueva" className="button primary">
+						<Icon name="plus" />
+						Registrar la primera
+					</a>
+				</div>
+			)}
 			<ul className="cards" aria-label="Pantallas">
 				{displays.data?.map((d) => (
-					<li key={d.deviceId} className="card row">
-						<div className="grow">
-							<Link to={`/displays/${d.deviceId}`}>
-								<strong>{d.name}</strong>
-							</Link>
-							<div className="muted">
-								<code>{d.deviceId}</code> · plantilla {d.activeTemplateId}
-							</div>
+					<li key={d.deviceId} className="card display-card">
+						<div className="row">
+							<span className="tile violet">
+								<Icon name="screen" />
+							</span>
+							<Online online={d.online} />
 						</div>
-						<Online online={d.online} />
+						<Link to={`/displays/${d.deviceId}`} className="stretch card-title">
+							{d.name}
+						</Link>
+						<div className="chips">
+							<span className="chip mono">{d.deviceId}</span>
+							<span className="chip">plantilla {d.activeTemplateId}</span>
+						</div>
 					</li>
 				))}
 			</ul>
 
-			<section>
+			<section id="nueva">
 				<h2>Registrar pantalla</h2>
-				<form className="stack" onSubmit={onSubmit}>
+				<form className="card stack" onSubmit={onSubmit}>
 					<label>
 						Id de la pantalla
 						<input
 							name="deviceId"
+							className="device-id"
 							required
 							pattern="md-[0-9a-fA-F]{12}"
 							placeholder="md-34B7DA01ABCD"
@@ -73,7 +107,9 @@ export function Displays() {
 						<input name="name" required maxLength={80} />
 					</label>
 					<Problems lines={[...invalid, ...api.errorLines(create.error)]} />
-					<button disabled={create.isPending}>Registrar pantalla</button>
+					<button className="primary" disabled={create.isPending}>
+						Registrar pantalla
+					</button>
 				</form>
 			</section>
 		</>
