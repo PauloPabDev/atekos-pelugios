@@ -133,7 +133,12 @@ for (i = 0, p = 0; i < len; i += 3) {
 
 **Cómo generar una imagen:**
 
-- **Desde la web.** En el editor de plantillas, «Importar imagen»: eliges un archivo y el tamaño, y se añade el elemento `image` al borrador. La web elige sola la codificación más corta.
+- **Desde la web**, con el **Lienzo** del editor de plantillas (botón «Lienzo e imagen»). Se abre una ventana con un lienzo de `w × h` píxeles reales de la pantalla, ampliado sin suavizar:
+  - **Tamaño y posición:** ancho, alto, `x` e `y`. Por defecto, la pantalla entera según la `rotation` del borrador. Hay atajos para «Pantalla completa» y «Mitad superior» o «Mitad inferior». Si no cabe, lo dice y no deja insertar.
+  - **Foto:** importas un archivo y eliges cómo encaja. «Ajustar» la deja entera, con bandas del color de fondo, y es lo que sale por defecto, así que nunca se deforma. «Rellenar» cubre el lienzo y recorta lo que sobra. «Estirar» la deforma. Además tienes zoom (10 %–400 %), «Mover» para arrastrarla (o las flechas con el lienzo enfocado) y «Centrar».
+  - **Dibujo:** lápiz, borrador, línea, rectángulo, elipse (contorno o relleno), bote de pintura y cuentagotas, con color, paleta y grosor de 1 a 32 px. Se puede deshacer y rehacer (Ctrl+Z y Ctrl+Y). El dibujo va en su propia capa: cambiar la foto, el encaje o el zoom no lo borra, y el borrador solo quita lo dibujado.
+  - **Editar una imagen existente:** el selector «Editar imagen n.º k» la carga a 1:1 y «Reemplazar imagen» la cambia en su sitio. Conserva sus `binds`, `when` y `visible`. Si cambias el ancho o el alto, se vuelve a encajar.
+  - **Resultado:** ves en vivo la codificación (la más corta) y lo que ocupará en la plantilla. Avisa si pasa de 100 KB. «Añadir a la plantilla» la pone al final de `elements`, o al principio con «Como fondo (debajo de todo)». No hay transparencia: lo que no cubren la foto ni el dibujo queda del color de fondo.
 - **Desde TypeScript**, con el mismo código que usa la API: `encodeImage(rgba, w, h)` de `@atekos/shared` devuelve `{ encoding, data }`. `rgba` son los bytes RGBA de cualquier fuente, por ejemplo `ImageData.data` o `sharp().raw()`.
 - **Desde Python**, con Pillow:
 

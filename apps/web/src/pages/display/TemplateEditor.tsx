@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
-import { currentFrame, displaySize, DisplayTemplate, encodeImage } from '@atekos/shared'
+import { currentFrame, DisplayTemplate } from '@atekos/shared'
 import type { DisplayDetail } from '@atekos/shared'
 import * as api from '../../api'
 import { DisplayPreview } from '../../components/DisplayPreview'
@@ -13,6 +13,7 @@ import { goalTemplate, showcaseTemplate, statusTemplate } from '../../examples'
 import { useDraft } from '../../hooks/useDraft'
 import { EXPLAIN, fmt, nextVersion, validate } from './common'
 import { useDisplay } from './DisplayLayout'
+import { ImageCanvas } from './ImageCanvas'
 
 // Una vacía con un id libre: así «Guardar» no pisa por descuido una plantilla que ya existe
 function blank(taken: { id: string }[]): DisplayTemplate {
@@ -72,6 +73,7 @@ function Editor({ d, initial, saved }: { d: DisplayDetail; initial: DisplayTempl
 	const [discarding, setDiscarding] = useState(false)
 	const [showActions, setShowActions] = useState(false)
 	const [playing, setPlaying] = useState(false)
+	const [drawing, setDrawing] = useState(false)
 	const shown = parsed.data ?? initial
 	const frame = useFrame(playing ? shown.animation : undefined)
 
@@ -186,7 +188,16 @@ function Editor({ d, initial, saved }: { d: DisplayDetail; initial: DisplayTempl
 								</button>
 							</div>
 						</details>
-						<ImportImage text={text} setText={setText} />
+						<button
+							type="button"
+							className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-sm font-medium text-fg sm:min-h-9"
+							onClick={() => setDrawing(true)}
+						>
+							Lienzo e imagen
+							<span className="ml-auto font-normal text-fg-subtle" aria-hidden="true">
+								Foto o dibujo
+							</span>
+						</button>
 					</div>
 					<div className="flex flex-col gap-1.5">
 						<label className="field">
@@ -265,6 +276,8 @@ function Editor({ d, initial, saved }: { d: DisplayDetail; initial: DisplayTempl
 					</div>
 				)}
 			</div>
+			{/* Fuera de los paneles: un <dialog> dentro de uno oculto (max-lg:hidden) no se vería */}
+			{drawing && <ImageCanvas text={text} setText={setText} onClose={() => setDrawing(false)} />}
 		</section>
 	)
 }
@@ -282,92 +295,4 @@ function useFrame(animation: DisplayTemplate['animation']) {
 		}
 	}, [animation])
 	return animation ? frame : 0
-}
-
-// Archivo de imagen → canvas al tamaño elegido → RGB565 (la codificación más corta) → elemento image al final del borrador
-function ImportImage({ text, setText }: { text: string; setText: (t: string) => void }) {
-	const [size, setSize] = useState({ w: '', h: '' })
-	const [error, setError] = useState<string | null>(null)
-	const file = useRef<HTMLInputElement>(null)
-
-	async function importFile(f: File) {
-		setError(null)
-		let t: { rotation?: number; elements?: unknown[] }
-		try {
-			t = JSON.parse(text)
-			if (typeof t !== 'object' || t === null || Array.isArray(t)) throw new Error()
-		} catch {
-			return setError('El borrador no es una plantilla JSON válida: corrígelo antes de importar la imagen.')
-		}
-		const canvas = displaySize(t.rotation)
-		// vacío = el lienzo entero según la rotación del borrador
-		const dim = (v: string, max: number) => Math.min(Math.max(Math.round(Number(v)) || max, 1), max)
-		const w = dim(size.w, canvas.width)
-		const h = dim(size.h, canvas.height)
-		try {
-			const bitmap = await createImageBitmap(f)
-			const c = document.createElement('canvas')
-			c.width = w
-			c.height = h
-			const ctx = c.getContext('2d')
-			if (!ctx) throw new Error('sin canvas 2d')
-			ctx.drawImage(bitmap, 0, 0, w, h)
-			const image = encodeImage(ctx.getImageData(0, 0, w, h).data, w, h)
-			setText(fmt({ ...t, elements: [...(t.elements ?? []), { type: 'image', x: 0, y: 0, w, h, ...image }] }))
-		} catch (e) {
-			setError(`No se pudo leer la imagen: ${(e as Error).message}`)
-		} finally {
-			if (file.current) file.current.value = '' // permite volver a importar el mismo archivo
-		}
-	}
-
-	return (
-		<details>
-			<summary>Importar imagen</summary>
-			<div className="space-y-3 pb-3">
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-[7rem_7rem_minmax(0,1fr)]">
-					<label className="field">
-						Ancho (px)
-						<input
-							type="number"
-							min={1}
-							max={320}
-							value={size.w}
-							placeholder="lienzo"
-							onChange={(e) => setSize({ ...size, w: e.target.value })}
-						/>
-					</label>
-					<label className="field">
-						Alto (px)
-						<input
-							type="number"
-							min={1}
-							max={320}
-							value={size.h}
-							placeholder="lienzo"
-							onChange={(e) => setSize({ ...size, h: e.target.value })}
-						/>
-					</label>
-					<label className="field col-span-2 sm:col-span-1">
-						Archivo
-						<input
-							ref={file}
-							type="file"
-							accept="image/*"
-							aria-describedby="import-hint"
-							onChange={(e) => {
-								const f = e.target.files?.[0]
-								if (f) void importFile(f)
-							}}
-						/>
-					</label>
-				</div>
-				<small id="import-hint" className="block">
-					Se escala al tamaño elegido (vacío = el lienzo entero), se pasa a RGB565 con la compresión más corta y se
-					añade como elemento image en x 0, y 0. Muévelo editando el JSON.
-				</small>
-				<Problems lines={error ? [error] : []} />
-			</div>
-		</details>
-	)
 }
