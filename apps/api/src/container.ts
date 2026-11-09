@@ -28,7 +28,7 @@ import { ListDevices } from './modules/devices/application/list-devices'
 import { ListEvents } from './modules/devices/application/list-events'
 import { ListPublicDevices } from './modules/devices/application/list-public-devices'
 import { makeOnDeviceChanged } from './modules/devices/application/on-device-changed'
-import { PatchData } from './modules/devices/application/patch-data'
+import { DeleteDataKey, PatchData } from './modules/devices/application/patch-data'
 import { PatchDevice } from './modules/devices/application/patch-device'
 import { SetState } from './modules/devices/application/set-state'
 import { ToggleState } from './modules/devices/application/toggle-state'
@@ -148,6 +148,7 @@ export async function createContainer(env: Env, logger: Logger) {
 			toggle,
 			patch: new PatchDevice({ repo: deviceRepo, onChanged }),
 			patchData: new PatchData({ repo: deviceRepo, onChanged }),
+			deleteDataKey: new DeleteDataKey({ repo: deviceRepo, onChanged }),
 			getDataKey: new GetDataKey({ get: getDevice }),
 			listEvents: new ListEvents({ get: getDevice, eventLog }),
 			delete: new DeleteDevice({ repo: deviceRepo, cache, eventLog, redis, logger }),

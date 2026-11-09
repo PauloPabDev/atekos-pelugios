@@ -16,3 +16,18 @@ export class PatchData {
 		return after
 	}
 }
+
+// PATCH solo mezcla (`data || patch`): para quitar una clave hace falta esto. Mismo permiso y evento que PATCH.
+export class DeleteDataKey {
+	constructor(private readonly deps: { repo: DeviceRepository; onChanged: OnDeviceChanged }) {}
+
+	async execute(actor: Actor, deviceId: string, key: string) {
+		const before = await this.deps.repo.findById(deviceId)
+		if (!before || !canRead(actor, before)) throw NotFound('Dispositivo')
+		if (!canWrite(actor, before, 'devices:write')) throw Forbidden()
+		if (!Object.hasOwn(before.data, key)) throw NotFound('Clave')
+		const after = await this.deps.repo.deleteDataKey(deviceId, key)
+		await this.deps.onChanged({ type: 'data.changed', before, after, actor, source: 'http' })
+		return after
+	}
+}
