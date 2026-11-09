@@ -7,6 +7,7 @@ import { DisplayPreview } from '../../components/DisplayPreview'
 import { Problems } from '../../components/Problems'
 import { Status } from '../../components/Status'
 import { Online } from '../Displays'
+import { NextSchedules } from '../schedules/NextSchedules'
 import { EXPLAIN } from './common'
 import { TouchRow, useTouches } from './DisplayActivity'
 import { useDisplay } from './DisplayLayout'
@@ -127,8 +128,7 @@ export function DisplayLive() {
 						</div>
 					</section>
 
-					{/* Próximos programas: hueco para la tarjeta de pages/schedules, que integra el orquestador */}
-					<div data-slot="proximos-programas" />
+					<NextSchedules target={{ kind: 'display', id: d.deviceId }} />
 				</div>
 			</div>
 
