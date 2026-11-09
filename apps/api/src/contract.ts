@@ -6,13 +6,13 @@ export type ContractFile = keyof typeof build
 export const CONTRACT_FILES = Object.keys(build) as ContractFile[]
 
 const cache = new Map<string, string>()
-// Se genera una vez por origen: los esquemas no cambian mientras el proceso vive.
-export function contractJson(file: ContractFile, origin: string) {
-	const key = `${file} ${origin}`
+// Se genera una vez por origen: los esquemas no cambian mientras el proceso vive. maxBytes = DISPLAY_MAX_TEMPLATE_BYTES.
+export function contractJson(file: ContractFile, origin: string, maxBytes: number) {
+	const key = `${file} ${origin} ${maxBytes}`
 	let json = cache.get(key)
 	if (!json) {
 		if (cache.size >= 8) cache.clear() // sin PUBLIC_URL el origen sale del Host del cliente: que no crezca sin límite
-		cache.set(key, (json = JSON.stringify(build[file](origin))))
+		cache.set(key, (json = JSON.stringify(build[file](origin, maxBytes))))
 	}
 	return json
 }

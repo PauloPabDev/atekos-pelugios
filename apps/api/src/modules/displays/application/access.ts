@@ -9,6 +9,7 @@ export type DisplayDeps = {
 	presence: DisplayPresence
 	outbox: DisplayOutbox
 	eventLog: DisplayEventLog
+	maxMessageBytes: number // DISPLAY_MAX_TEMPLATE_BYTES
 }
 
 export const toDisplay = (d: DisplayRecord, online: boolean): Display => ({

@@ -102,6 +102,7 @@ export async function createContainer(env: Env, logger: Logger) {
 		presence: makeRedisDisplayPresence(redis),
 		outbox: makeRedisDisplayOutbox(redis, sub),
 		eventLog: makeMongoDisplayEventLog(mongo),
+		maxMessageBytes: env.DISPLAY_MAX_TEMPLATE_BYTES,
 	}
 
 	const od = { repo: makePgOAuthRepository(db), store: makeRedisOAuthStore(redis), hasher }

@@ -5,7 +5,7 @@ import { findAdmin, toDisplay, type DisplayDeps } from './access'
 import { assertFits, publishAll, snapshotMessages } from './messages'
 
 export class PatchDisplay {
-	constructor(private readonly deps: Pick<DisplayDeps, 'repo' | 'presence' | 'outbox'>) {}
+	constructor(private readonly deps: Pick<DisplayDeps, 'repo' | 'presence' | 'outbox' | 'maxMessageBytes'>) {}
 
 	async execute(actor: Actor, hardwareId: string, patch: PatchDisplayInput) {
 		const { repo, outbox } = this.deps
@@ -14,7 +14,7 @@ export class PatchDisplay {
 			// Se lee antes para comprobar el tamaño sin haber guardado nada; setActive lo vuelve a exigir con la fila bloqueada.
 			const t = await repo.findTemplate(d.id, patch.activeTemplateId)
 			if (!t) throw Unprocessable('template_not_found', `No existe la plantilla ${patch.activeTemplateId}`)
-			assertFits(snapshotMessages(d, t))
+			assertFits(snapshotMessages(d, t), this.deps.maxMessageBytes)
 			const { display, template } = await repo.setActive(d.id, t.id)
 			d = display
 			await publishAll(outbox, d.id, snapshotMessages(display, template))

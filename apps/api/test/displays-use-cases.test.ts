@@ -1,7 +1,9 @@
 import { DISPLAY_MAX_FRAME, DisplayTemplate, type DisplayValues } from '@atekos/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { initialTemplate } from '../src/modules/displays/application/create-display'
+import { fragment } from '../src/modules/displays/application/messages'
 import { PatchData } from '../src/modules/displays/application/patch-data'
+import { PutData } from '../src/modules/displays/application/put-data'
 import { PutTemplate } from '../src/modules/displays/application/put-template'
 import type { Actor } from '../src/modules/devices/domain/policy'
 import type { DisplayOutbox, DisplayRecord, DisplayRepository } from '../src/modules/displays/domain/ports'
@@ -34,11 +36,16 @@ function fakes() {
 	}
 	const outbox = { publish: vi.fn(async () => {}), subscribe: vi.fn(async () => {}) } satisfies DisplayOutbox
 	const presence = { add: vi.fn(), renew: vi.fn(), remove: vi.fn(), isOnline: vi.fn(async () => false) }
-	return { repo, outbox, deps: { repo: repo as unknown as DisplayRepository, outbox, presence } }
+	// Tope pequeño (el real es DISPLAY_MAX_TEMPLATE_BYTES) para probar el 413 con plantillas cortas.
+	return {
+		repo,
+		outbox,
+		deps: { repo: repo as unknown as DisplayRepository, outbox, presence, maxMessageBytes: DISPLAY_MAX_FRAME },
+	}
 }
 
-describe('límite de trama', () => {
-	it('una plantilla válida pero de más de 8192 bytes → 413 sin guardar ni publicar', async () => {
+describe('tope de mensaje', () => {
+	it('una plantilla válida pero de más bytes que el tope → 413 sin guardar ni publicar', async () => {
 		// 45 textos de 140 «ñ»: menos de 8192 caracteres, pero más de 8192 bytes en UTF-8.
 		const big = DisplayTemplate.parse({
 			id: 'grande',
@@ -80,6 +87,50 @@ describe('PatchData', () => {
 		expect(repo.mergeValues).not.toHaveBeenCalled()
 		expect(outbox.publish).not.toHaveBeenCalled()
 	})
+})
+
+describe('params de la plantilla activa', () => {
+	const withParams = () => {
+		const f = fakes()
+		f.repo.findTemplate.mockResolvedValue({
+			...initialTemplate('Sala'),
+			params: { temp: { type: 'number', min: -20, max: 60 }, mensaje: { type: 'string' } },
+		})
+		return f
+	}
+
+	it('PATCH con un tipo equivocado → 422 invalid_data con issues, sin escribir ni publicar', async () => {
+		const { repo, outbox, deps } = withParams()
+		const err = await new PatchData(deps).execute(owner, hw, { temp: 'calor' }).catch((e: AppError) => e)
+		expect(err).toMatchObject({ status: 422, code: 'invalid_data', issues: [{ path: ['temp'] }] })
+		expect(repo.mergeValues).not.toHaveBeenCalled()
+		expect(outbox.publish).not.toHaveBeenCalled()
+	})
+
+	it('PUT fuera de min/max → 422; claves no declaradas y null se aceptan', async () => {
+		const { deps } = withParams()
+		const replaceValues = vi.fn(async (_id: string, values: DisplayValues) => ({ ...record, values }))
+		Object.assign(deps.repo, { replaceValues })
+		const put = new PutData(deps)
+		await expect(put.execute(owner, hw, { temp: 61 })).rejects.toMatchObject({ status: 422, code: 'invalid_data' })
+		expect(replaceValues).not.toHaveBeenCalled()
+		await expect(put.execute(owner, hw, { temp: 21, mensaje: null, otra: true })).resolves.toEqual({
+			values: { temp: 21, mensaje: null, otra: true },
+		})
+	})
+})
+
+it('fragment: tramas frag de ≤ 8192 bytes, seguidas, que reensambladas dan el mensaje', () => {
+	const json = JSON.stringify({ type: 'template.set', template: { id: 'x', data: 'ñ'.repeat(20_000) } })
+	const frames = fragment(json).map((f) => {
+		expect(Buffer.byteLength(f)).toBeLessThanOrEqual(DISPLAY_MAX_FRAME)
+		return JSON.parse(f) as { type: string; id: string; seq: number; count: number; bytes: number; data: string }
+	})
+	expect(frames.length).toBeGreaterThan(1)
+	expect(frames.map((f) => f.seq)).toEqual(frames.map((_, i) => i))
+	expect(new Set(frames.map((f) => `${f.type} ${f.id} ${f.count} ${f.bytes}`)).size).toBe(1)
+	expect(frames[0]).toMatchObject({ type: 'frag', count: frames.length, bytes: Buffer.byteLength(json) })
+	expect(Buffer.concat(frames.map((f) => Buffer.from(f.data, 'base64'))).toString()).toBe(json)
 })
 
 it('la plantilla inicial cumple el esquema', () => {
